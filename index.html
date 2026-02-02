@@ -1,0 +1,1868 @@
+<!-- ✅ What I changed:
+1) Only ONE page per HW (removed loop 1..5)
+2) Arabic UI (dir="rtl", Arabic labels, Arabic subject names)
+3) When user clicks "عرض" it opens the full text viewer مباشرة (no buttons inside)
+4) Updated data structure: texts[sub][hw] = `نص واحد`
+-->
+
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>بوابة مواد الكلية</title>
+
+<style>
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:system-ui, Arial;
+  background:#f3f4f6;
+  color:#111;
+  direction: rtl;
+}
+
+header{
+  background:#ff0000;
+  color:#fff;
+  padding:16px;
+  text-align:center;
+}
+
+.hidden{display:none}
+.main{padding:16px}
+
+/* ===== CARDS ===== */
+.cards{
+  display:grid;
+  grid-template-columns:repeat(2,1fr);
+  gap:14px;
+}
+.card{
+  background:#fff;
+  border-radius:16px;
+  padding:14px;
+  text-align:center;
+  box-shadow:0 12px 28px rgba(0,0,0,.16);
+  cursor:pointer;
+  transition:transform .08s ease;
+}
+.card:hover{transform:translateY(-2px)}
+.card svg{
+  width:80px;
+  height:80px;
+  fill:#ff0000;
+}
+.card span{
+  display:block;
+  margin-top:6px;
+  font-weight:700;
+}
+
+/* ===== SUBJECT ===== */
+.subject{display:none}
+.subject.active{display:block}
+
+.back{
+  background:#fff;
+  border:2px solid #ff0000;
+  color:#ff0000;
+  font-weight:800;
+  padding:12px 16px;
+  border-radius:12px;
+  cursor:pointer;
+  display:inline-flex;
+  align-items:center;
+  gap:10px;
+  margin-bottom:12px;
+}
+
+/* ===== TABLE ===== */
+.table-wrap{overflow-x:auto;margin-bottom:16px}
+table{
+  width:100%;
+  min-width:360px;
+  border-collapse:collapse;
+  background:#fff;
+}
+th,td{
+  border:1px solid #e5e7eb;
+  padding:10px;
+  text-align:center;
+}
+th{
+  background:#ff0000;
+  color:#fff;
+}
+
+.table-wrap table th:last-child,
+.table-wrap table td:last-child{
+  width:180px;
+  white-space:nowrap;
+}
+
+/* فواصل خفيفة بين الأقسام داخل المادة الواحدة */
+.table-wrap + .table-wrap,
+.table-wrap + .hw,
+.table-wrap + .note,
+.hw + .hw,
+.hw + .note{
+  margin-top:16px;
+}
+
+/* ===== HOMEWORK ===== */
+.hw{
+  background:#fff;
+  padding:14px;
+  border-radius:14px;
+  margin-bottom:12px;
+  box-shadow:0 10px 24px rgba(0,0,0,.14);
+}
+
+/* حاوية الواجبات مع عنوان وفاصل علوي */
+.hw-section{
+  margin-top:24px;
+  padding:12px;
+  background:#fff;
+  border:0;
+  border-radius:16px;
+  width:100%;
+  max-width:none;
+  margin-inline:0;
+  overflow:hidden;
+}
+.hw-section .section-title{
+  margin:-12px -12px 12px;
+  font-weight:900;
+  font-size:22px;
+  background:#ff0000;
+  color:#fff;
+  padding:12px 14px;
+  border-radius:14px 14px 0 0;
+}
+
+/* بطاقات الأقسام (كوزات، مدات، واجبات، ملازم، ملاحظات) */
+.section-card{
+  background:#fff;
+  border:0;
+  border-radius:16px;
+  padding:12px;
+  margin-top:16px;
+  width:100%;
+  max-width:none;
+  box-shadow:0 12px 28px rgba(0,0,0,.16);
+}
+.section-head{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+}
+.section-head h3{
+  margin:0;
+  font-weight:900;
+  font-size:20px;
+}
+.section-toggle{min-width:110px;}
+.section-content{display:none;}
+.section-card.open .section-content{display:block;}
+
+/* حاوية الملازم داخل كل مادة */
+.pdf-section{
+  margin-top:18px;
+  padding:12px;
+  background:#fff;
+  border:0;
+  border-radius:16px;
+  width:100%;
+  max-width:none;
+  margin-inline:0;
+  overflow:hidden;
+}
+.pdf-section .section-title{
+  margin:-12px -12px 12px;
+  font-weight:900;
+  font-size:22px;
+  background:#ff0000;
+  color:#fff;
+  padding:12px 14px;
+  border-radius:14px 14px 0 0;
+}
+.hw-head{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:12px;
+}
+.toggle{
+  background:#ff0000;
+  color:#fff;
+  border:none;
+  padding:16px 24px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:800;
+  font-size:18px;
+  min-width:120px;
+}
+
+/* تجميع أزرار الـ PDF داخل الواجبات */
+.pdf-actions{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-top:10px;
+}
+
+/* أزرار الـ PDF باللون الأسود */
+.pdf-btn{
+  background:#111;
+  color:#fff;
+  border:none;
+  padding:14px 18px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:800;
+  font-size:16px;
+  min-width:140px;
+}
+
+/* أزرار الكوز/المد داخل الجداول بنفس عمود واحد وباللون الأسود */
+.table-btn{
+  display:block;
+  width:calc(100% - 25px);
+  max-width:none;
+  margin:0;
+  padding:14px 18px;
+  font-size:16px;
+  font-weight:800;
+  border-radius:12px;
+  background:#111;
+  color:#fff;
+  border:0;
+  min-width:120px;
+}
+
+/* ===== NOTES (MATCH HW STYLE, TALLER) ===== */
+.note{
+  background:#fff;
+  padding:16px;
+  border-radius:14px;
+  margin-top:14px;
+  box-shadow:0 10px 24px rgba(0,0,0,.14);
+  padding-top:0;
+}
+.note-header{
+  width:100%;
+  background:#ff0000;
+  color:#fff;
+  padding:12px 16px;
+  border-radius:14px 14px 0 0;
+  font-weight:900;
+  text-align:center;
+}
+.note-head{
+  width:100%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:16px;
+}
+.note-title{
+  margin:0;
+  font-size:28px;
+  font-weight:900;
+  font-family:"Georgia","Times New Roman",serif;
+}
+.note-body{
+  width:100%;
+  padding:0 16px 16px;
+  line-height:1.8;
+  white-space:pre-wrap;
+  font-size:16px;
+  color:#111;
+}
+
+/* ===== FULLSCREEN TEXT VIEWER ===== */
+.text-viewer{
+  position:fixed;
+  inset:0;
+  background:rgba(0,0,0,.75);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  z-index:9999;
+  padding:16px;
+}
+.text-viewer.hidden{display:none;}
+
+.text-panel{
+  width:min(900px, 100%);
+  height:min(90vh, 100%);
+  background:#fff;
+  border-radius:16px;
+  overflow:hidden;
+  display:flex;
+  flex-direction:column;
+}
+
+.text-top{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  padding:14px 16px;
+  background:#ff0000;
+  color:#fff;
+}
+.text-top h3{
+  margin:0;
+  font-size:18px;
+}
+.text-close{
+  background:transparent;
+  border:0;
+  color:#fff;
+  font-size:26px;
+  cursor:pointer;
+  font-weight:900;
+}
+.text-body{
+  padding:16px;
+  overflow:auto;
+  line-height:1.9;
+  font-size:16px;
+  white-space:pre-wrap;
+}
+
+.pdf-panel{
+  width:min(1000px, 100%);
+}
+.pdf-body{
+  flex:1;
+  background:#111;
+  display:flex;
+}
+.pdf-embed{
+  width:100%;
+  height:100%;
+  border:0;
+  background:#111;
+}
+
+@media(min-width:768px){
+  .cards{grid-template-columns:repeat(4,1fr)}
+}
+</style>
+</head>
+
+<body>
+
+<!-- FULLSCREEN TEXT VIEWER -->
+<div id="textViewer" class="text-viewer hidden">
+  <div class="text-panel">
+    <div class="text-top">
+      <h3 id="textTitle">العنوان</h3>
+      <button class="text-close" onclick="closeText()">✕</button>
+    </div>
+    <div id="textBody" class="text-body"></div>
+  </div>
+</div>
+
+<!-- FULLSCREEN PDF VIEWER -->
+<div id="pdfViewer" class="text-viewer hidden">
+  <div class="text-panel pdf-panel">
+    <div class="text-top">
+      <h3 id="pdfTitle">PDF</h3>
+      <button class="text-close" onclick="closePdf()">✕</button>
+    </div>
+    <div class="pdf-body">
+      <embed id="pdfEmbed" class="pdf-embed" type="application/pdf" src="">
+    </div>
+  </div>
+</div>
+
+<header>
+  <h1>علوم الحاسوب - هندسة البرمجيات - مرحلة ثانية</h1>
+  <p></p>
+</header>
+
+<div class="main">
+
+  <!-- ================= HOME ================= -->
+  <div id="home">
+    <div class="cards">
+
+      <div class="card" onclick="openSub('db')">
+        <svg viewBox="0 0 24 24"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14c0 1.7 4 3 9 3s9-1.3 9-3V5"/></svg>
+        <span>قواعد البيانات</span>
+      </div>
+
+      <div class="card" onclick="openSub('micro')">
+        <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16"/></svg>
+        <span>المعالج الدقيق</span>
+      </div>
+
+      <div class="card" onclick="openSub('cc')">
+        <svg viewBox="0 0 24 24"><path d="M3 17l6-6 4 4 8-8"/></svg>
+        <span>تعقيد</span>
+      </div>
+
+      <div class="card" onclick="openSub('algo')">
+        <svg viewBox="0 0 24 24"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="12" r="3"/></svg>
+        <span>الخوارزميات</span>
+      </div>
+
+      <div class="card" onclick="openSub('arabic')">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <!-- رمز عربي بسيط: حرف عين بخط افتراضي -->
+          <text x="12" y="16" font-size="16" font-family="Scheherazade, 'Amiri', 'Traditional Arabic', serif" text-anchor="middle">ع</text>
+        </svg>
+        <span>اللغة العربية</span>
+      </div>
+
+      <div class="card" onclick="openSub('english')">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <!-- حرف E بسيط -->
+          <path d="M6 4h12v3H9v4h8v3H9v4h9v3H6z" />
+        </svg>
+        <span>اللغة الإنجليزية</span>
+      </div>
+
+      <div class="card" onclick="openSub('se')">
+        <svg viewBox="0 0 24 24"><path d="M7 5l-4 7 4 7"/><path d="M17 5l4 7-4 7"/></svg>
+        <span>هندسة البرمجيات</span>
+      </div>
+
+      <div class="card" onclick="openSub('pdfs')">
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M6 3h8l4 4v14H6z" fill="#ff0000" opacity=".2"/>
+          <path d="M14 3v5h5" fill="none" stroke="#ff0000" stroke-width="2" stroke-linejoin="round"/>
+          <path d="M8 13h8M8 16h5M8 19h8" stroke="#ff0000" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+        <span>ملفات PDF</span>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ================= SUBJECTS ================= -->
+
+  <!-- DATABASES -->
+  <div id="db" class="subject">
+    <button class="back" onclick="goHome()">الرجوع للرئيسية ←</button>
+    <h2>قواعد البيانات</h2>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الكوزات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="quiz-table" data-sub="db">
+            <tr><th>كوز</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>1</td><td>10-02-2026</td><td><button class="toggle table-btn" data-sub="db" data-quiz="1" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>2</td><td>24-02-2026</td><td><button class="toggle table-btn" data-sub="db" data-quiz="2" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>3</td><td>10-03-2026</td><td><button class="toggle table-btn" data-sub="db" data-quiz="3" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>4</td><td>24-03-2026</td><td><button class="toggle table-btn" data-sub="db" data-quiz="4" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>5</td><td>07-04-2026</td><td><button class="toggle table-btn" data-sub="db" data-quiz="5" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>6</td><td>21-04-2026</td><td><button class="toggle table-btn" data-sub="db" data-quiz="6" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>المدات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="mid-table" data-sub="db">
+            <tr><th>مد</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>مد 1</td><td>01-03-2026</td><td><button class="toggle table-btn" data-sub="db" data-mid="1" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 2</td><td>01-04-2026</td><td><button class="toggle table-btn" data-sub="db" data-mid="2" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 3</td><td>01-05-2026</td><td><button class="toggle table-btn" data-sub="db" data-mid="3" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الواجبات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="hw-section">
+          <div class="section-title">الواجبات</div>
+          <div class="hw" data-sub="db" data-hw="1">
+            <div class="hw-head"><h3>الواجب 1</h3><button class="toggle" onclick="openHW(this)">عرض</button></div>
+          </div>
+          <div class="hw" data-sub="db" data-hw="2">
+            <div class="hw-head"><h3>الواجب 2</h3><button class="toggle" onclick="openHW(this)">عرض</button></div>
+          </div>
+          <div class="hw" data-sub="db" data-hw="3">
+            <div class="hw-head"><h3>الواجب 3</h3><button class="toggle" onclick="openHW(this)">عرض</button></div>
+          </div>
+          <div class="hw" data-sub="db" data-hw="4">
+            <div class="hw-head"><h3>الواجب 4</h3><button class="toggle" onclick="openHW(this)">عرض</button></div>
+          </div>
+          <div class="hw" data-sub="db" data-hw="5">
+            <div class="hw-head"><h3>الواجب 5</h3><button class="toggle" onclick="openHW(this)">عرض</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملازم</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="pdf-section">
+          <div class="section-title">الملازم</div>
+          <div class="pdf-actions">
+            <button class="pdf-btn" onclick="openPdf('db','practical')">عملي.pdf</button>
+            <button class="pdf-btn" onclick="openPdf('db','theory')">نظري.pdf</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملاحظات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="note" data-sub="db">
+          <div class="note-header">ملاحظات قواعد البيانات</div>
+          <div class="note-head">
+            <h3 class="note-title">ملاحظات</h3>
+          </div>
+          <div class="note-body" data-sub="db"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MICRO -->
+  <div id="micro" class="subject">
+    <button class="back" onclick="goHome()">الرجوع للرئيسية ←</button>
+    <h2>المعالج الدقيق</h2>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الكوزات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="quiz-table" data-sub="micro">
+            <tr><th>كوز</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>1</td><td>12-02-2026</td><td><button class="toggle table-btn" data-sub="micro" data-quiz="1" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>2</td><td>26-02-2026</td><td><button class="toggle table-btn" data-sub="micro" data-quiz="2" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>3</td><td>12-03-2026</td><td><button class="toggle table-btn" data-sub="micro" data-quiz="3" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>4</td><td>26-03-2026</td><td><button class="toggle table-btn" data-sub="micro" data-quiz="4" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>5</td><td>09-04-2026</td><td><button class="toggle table-btn" data-sub="micro" data-quiz="5" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>6</td><td>23-04-2026</td><td><button class="toggle table-btn" data-sub="micro" data-quiz="6" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>المدات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="mid-table" data-sub="micro">
+            <tr><th>مد</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>مد 1</td><td>03-03-2026</td><td><button class="toggle table-btn" data-sub="micro" data-mid="1" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 2</td><td>03-04-2026</td><td><button class="toggle table-btn" data-sub="micro" data-mid="2" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 3</td><td>03-05-2026</td><td><button class="toggle table-btn" data-sub="micro" data-mid="3" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الواجبات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="hw-section">
+          <div class="section-title">الواجبات</div>
+          <div class="hw" data-sub="micro" data-hw="1"><div class="hw-head"><h3>الواجب 1</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="micro" data-hw="2"><div class="hw-head"><h3>الواجب 2</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="micro" data-hw="3"><div class="hw-head"><h3>الواجب 3</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="micro" data-hw="4"><div class="hw-head"><h3>الواجب 4</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="micro" data-hw="5"><div class="hw-head"><h3>الواجب 5</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملازم</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="pdf-section">
+          <div class="section-title">الملازم</div>
+          <div class="pdf-actions">
+            <button class="pdf-btn" onclick="openPdf('micro','practical')">عملي.pdf</button>
+            <button class="pdf-btn" onclick="openPdf('micro','theory')">نظري.pdf</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملاحظات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="note" data-sub="micro">
+          <div class="note-header">ملاحظات المعالج الدقيق</div>
+          <div class="note-head">
+            <h3 class="note-title">ملاحظات</h3>
+          </div>
+          <div class="note-body" data-sub="micro"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CC -->
+  <div id="cc" class="subject">
+    <button class="back" onclick="goHome()">الرجوع للرئيسية ←</button>
+    <h2>تعقيد</h2>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الكوزات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="quiz-table" data-sub="cc">
+            <tr><th>كوز</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>1</td><td>15-02-2026</td><td><button class="toggle table-btn" data-sub="cc" data-quiz="1" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>2</td><td>01-03-2026</td><td><button class="toggle table-btn" data-sub="cc" data-quiz="2" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>3</td><td>15-03-2026</td><td><button class="toggle table-btn" data-sub="cc" data-quiz="3" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>4</td><td>29-03-2026</td><td><button class="toggle table-btn" data-sub="cc" data-quiz="4" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>5</td><td>12-04-2026</td><td><button class="toggle table-btn" data-sub="cc" data-quiz="5" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>6</td><td>26-04-2026</td><td><button class="toggle table-btn" data-sub="cc" data-quiz="6" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>المدات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="mid-table" data-sub="cc">
+            <tr><th>مد</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>مد 1</td><td>05-03-2026</td><td><button class="toggle table-btn" data-sub="cc" data-mid="1" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 2</td><td>05-04-2026</td><td><button class="toggle table-btn" data-sub="cc" data-mid="2" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 3</td><td>05-05-2026</td><td><button class="toggle table-btn" data-sub="cc" data-mid="3" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الواجبات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="hw-section">
+          <div class="section-title">الواجبات</div>
+          <div class="hw" data-sub="cc" data-hw="1"><div class="hw-head"><h3>الواجب 1</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="cc" data-hw="2"><div class="hw-head"><h3>الواجب 2</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="cc" data-hw="3"><div class="hw-head"><h3>الواجب 3</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="cc" data-hw="4"><div class="hw-head"><h3>الواجب 4</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="cc" data-hw="5"><div class="hw-head"><h3>الواجب 5</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملازم</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="pdf-section">
+          <div class="section-title">الملازم</div>
+          <div class="pdf-actions">
+            <button class="pdf-btn" onclick="openPdf('cc','practical')">عملي.pdf</button>
+            <button class="pdf-btn" onclick="openPdf('cc','theory')">نظري.pdf</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملاحظات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="note" data-sub="cc">
+          <div class="note-header">ملاحظات تعقيد</div>
+          <div class="note-head">
+            <h3 class="note-title">ملاحظات</h3>
+          </div>
+          <div class="note-body" data-sub="cc"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ALGO -->
+  <div id="algo" class="subject">
+    <button class="back" onclick="goHome()">الرجوع للرئيسية ←</button>
+    <h2>الخوارزميات</h2>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الكوزات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="quiz-table" data-sub="algo">
+            <tr><th>كوز</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>1</td><td>14-02-2026</td><td><button class="toggle table-btn" data-sub="algo" data-quiz="1" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>2</td><td>28-02-2026</td><td><button class="toggle table-btn" data-sub="algo" data-quiz="2" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>3</td><td>14-03-2026</td><td><button class="toggle table-btn" data-sub="algo" data-quiz="3" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>4</td><td>28-03-2026</td><td><button class="toggle table-btn" data-sub="algo" data-quiz="4" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>5</td><td>11-04-2026</td><td><button class="toggle table-btn" data-sub="algo" data-quiz="5" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>6</td><td>25-04-2026</td><td><button class="toggle table-btn" data-sub="algo" data-quiz="6" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>المدات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="mid-table" data-sub="algo">
+            <tr><th>مد</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>مد 1</td><td>04-03-2026</td><td><button class="toggle table-btn" data-sub="algo" data-mid="1" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 2</td><td>04-04-2026</td><td><button class="toggle table-btn" data-sub="algo" data-mid="2" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 3</td><td>04-05-2026</td><td><button class="toggle table-btn" data-sub="algo" data-mid="3" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الواجبات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="hw-section">
+          <div class="section-title">الواجبات</div>
+          <div class="hw" data-sub="algo" data-hw="1"><div class="hw-head"><h3>الواجب 1</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="algo" data-hw="2"><div class="hw-head"><h3>الواجب 2</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="algo" data-hw="3"><div class="hw-head"><h3>الواجب 3</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="algo" data-hw="4"><div class="hw-head"><h3>الواجب 4</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="algo" data-hw="5"><div class="hw-head"><h3>الواجب 5</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملازم</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="pdf-section">
+          <div class="section-title">الملازم</div>
+          <div class="pdf-actions">
+            <button class="pdf-btn" onclick="openPdf('algo','practical')">عملي.pdf</button>
+            <button class="pdf-btn" onclick="openPdf('algo','theory')">نظري.pdf</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملاحظات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="note" data-sub="algo">
+          <div class="note-header">ملاحظات الخوارزميات</div>
+          <div class="note-head">
+            <h3 class="note-title">ملاحظات</h3>
+          </div>
+          <div class="note-body" data-sub="algo"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ARABIC -->
+  <div id="arabic" class="subject">
+    <button class="back" onclick="goHome()">الرجوع للرئيسية ←</button>
+    <h2>اللغة العربية</h2>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الكوزات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="quiz-table" data-sub="arabic">
+            <tr><th>كوز</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>1</td><td>11-02-2026</td><td><button class="toggle table-btn" data-sub="arabic" data-quiz="1" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>2</td><td>25-02-2026</td><td><button class="toggle table-btn" data-sub="arabic" data-quiz="2" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>3</td><td>11-03-2026</td><td><button class="toggle table-btn" data-sub="arabic" data-quiz="3" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>4</td><td>25-03-2026</td><td><button class="toggle table-btn" data-sub="arabic" data-quiz="4" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>5</td><td>08-04-2026</td><td><button class="toggle table-btn" data-sub="arabic" data-quiz="5" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>6</td><td>22-04-2026</td><td><button class="toggle table-btn" data-sub="arabic" data-quiz="6" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>المدات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="mid-table" data-sub="arabic">
+            <tr><th>مد</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>مد 1</td><td>02-03-2026</td><td><button class="toggle table-btn" data-sub="arabic" data-mid="1" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 2</td><td>02-04-2026</td><td><button class="toggle table-btn" data-sub="arabic" data-mid="2" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 3</td><td>02-05-2026</td><td><button class="toggle table-btn" data-sub="arabic" data-mid="3" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الواجبات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="hw-section">
+          <div class="section-title">الواجبات</div>
+          <div class="hw" data-sub="arabic" data-hw="1"><div class="hw-head"><h3>الواجب 1</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="arabic" data-hw="2"><div class="hw-head"><h3>الواجب 2</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="arabic" data-hw="3"><div class="hw-head"><h3>الواجب 3</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="arabic" data-hw="4"><div class="hw-head"><h3>الواجب 4</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="arabic" data-hw="5"><div class="hw-head"><h3>الواجب 5</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملازم</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="pdf-section">
+          <div class="section-title">الملازم</div>
+          <div class="pdf-actions">
+            <button class="pdf-btn" onclick="openPdf('arabic','practical')">عملي.pdf</button>
+            <button class="pdf-btn" onclick="openPdf('arabic','theory')">نظري.pdf</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملاحظات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="note" data-sub="arabic">
+          <div class="note-header">ملاحظات اللغة العربية</div>
+          <div class="note-head">
+            <h3 class="note-title">ملاحظات</h3>
+          </div>
+          <div class="note-body" data-sub="arabic"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ENGLISH -->
+  <div id="english" class="subject">
+    <button class="back" onclick="goHome()">الرجوع للرئيسية ←</button>
+    <h2>اللغة الإنجليزية</h2>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الكوزات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="quiz-table" data-sub="english">
+            <tr><th>كوز</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>1</td><td>13-02-2026</td><td><button class="toggle table-btn" data-sub="english" data-quiz="1" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>2</td><td>27-02-2026</td><td><button class="toggle table-btn" data-sub="english" data-quiz="2" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>3</td><td>13-03-2026</td><td><button class="toggle table-btn" data-sub="english" data-quiz="3" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>4</td><td>27-03-2026</td><td><button class="toggle table-btn" data-sub="english" data-quiz="4" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>5</td><td>10-04-2026</td><td><button class="toggle table-btn" data-sub="english" data-quiz="5" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>6</td><td>24-04-2026</td><td><button class="toggle table-btn" data-sub="english" data-quiz="6" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>المدات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="mid-table" data-sub="english">
+            <tr><th>مد</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>مد 1</td><td>06-03-2026</td><td><button class="toggle table-btn" data-sub="english" data-mid="1" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 2</td><td>06-04-2026</td><td><button class="toggle table-btn" data-sub="english" data-mid="2" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 3</td><td>06-05-2026</td><td><button class="toggle table-btn" data-sub="english" data-mid="3" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الواجبات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="hw-section">
+          <div class="section-title">الواجبات</div>
+          <div class="hw" data-sub="english" data-hw="1"><div class="hw-head"><h3>الواجب 1</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="english" data-hw="2"><div class="hw-head"><h3>الواجب 2</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="english" data-hw="3"><div class="hw-head"><h3>الواجب 3</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="english" data-hw="4"><div class="hw-head"><h3>الواجب 4</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="english" data-hw="5"><div class="hw-head"><h3>الواجب 5</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملازم</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="pdf-section">
+          <div class="section-title">الملازم</div>
+          <div class="pdf-actions">
+            <button class="pdf-btn" onclick="openPdf('english','practical')">عملي.pdf</button>
+            <button class="pdf-btn" onclick="openPdf('english','theory')">نظري.pdf</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملاحظات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="note" data-sub="english">
+          <div class="note-header">ملاحظات اللغة الإنجليزية</div>
+          <div class="note-head">
+            <h3 class="note-title">ملاحظات</h3>
+          </div>
+          <div class="note-body" data-sub="english"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SOFTWARE ENGINEERING -->
+  <div id="se" class="subject">
+    <button class="back" onclick="goHome()">الرجوع للرئيسية ←</button>
+    <h2>هندسة البرمجيات</h2>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الكوزات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="quiz-table" data-sub="se">
+            <tr><th>كوز</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>1</td><td>16-02-2026</td><td><button class="toggle table-btn" data-sub="se" data-quiz="1" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>2</td><td>01-03-2026</td><td><button class="toggle table-btn" data-sub="se" data-quiz="2" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>3</td><td>16-03-2026</td><td><button class="toggle table-btn" data-sub="se" data-quiz="3" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>4</td><td>30-03-2026</td><td><button class="toggle table-btn" data-sub="se" data-quiz="4" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>5</td><td>13-04-2026</td><td><button class="toggle table-btn" data-sub="se" data-quiz="5" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>6</td><td>27-04-2026</td><td><button class="toggle table-btn" data-sub="se" data-quiz="6" onclick="openQuiz(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>المدات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="table-wrap">
+          <table class="mid-table" data-sub="se">
+            <tr><th>مد</th><th>التاريخ</th><th>الأسئلة</th></tr>
+            <tr><td>مد 1</td><td>07-03-2026</td><td><button class="toggle table-btn" data-sub="se" data-mid="1" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 2</td><td>07-04-2026</td><td><button class="toggle table-btn" data-sub="se" data-mid="2" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+            <tr><td>مد 3</td><td>07-05-2026</td><td><button class="toggle table-btn" data-sub="se" data-mid="3" onclick="openMid(this)">عرض الاسئلة</button></td></tr>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الواجبات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="hw-section">
+          <div class="section-title">الواجبات</div>
+          <div class="hw" data-sub="se" data-hw="1"><div class="hw-head"><h3>الواجب 1</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="se" data-hw="2"><div class="hw-head"><h3>الواجب 2</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="se" data-hw="3"><div class="hw-head"><h3>الواجب 3</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="se" data-hw="4"><div class="hw-head"><h3>الواجب 4</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+          <div class="hw" data-sub="se" data-hw="5"><div class="hw-head"><h3>الواجب 5</h3><button class="toggle" onclick="openHW(this)">عرض</button></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملازم</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="pdf-section">
+          <div class="section-title">الملازم</div>
+          <div class="pdf-actions">
+            <button class="pdf-btn" onclick="openPdf('se','practical')">عملي.pdf</button>
+            <button class="pdf-btn" onclick="openPdf('se','theory')">نظري.pdf</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-card">
+      <div class="section-head">
+        <h3>الملاحظات</h3>
+        <button class="toggle section-toggle" onclick="toggleSection(this)">عرض</button>
+      </div>
+      <div class="section-content">
+        <div class="note" data-sub="se">
+          <div class="note-header">ملاحظات هندسة البرمجيات</div>
+          <div class="note-head">
+            <h3 class="note-title">ملاحظات</h3>
+          </div>
+          <div class="note-body" data-sub="se"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDFs -->
+  <div id="pdfs" class="subject">
+    <button class="back" onclick="goHome()">الرجوع للرئيسية ←</button>
+    <h2>ملفات PDF لكل مادة</h2>
+
+    <div class="hw">
+      <div class="hw-head"><h3>قواعد البيانات</h3></div>
+      <div class="pdf-actions">
+        <button class="pdf-btn" onclick="openPdf('db','practical')">عملي.pdf</button>
+        <button class="pdf-btn" onclick="openPdf('db','theory')">نظري.pdf</button>
+      </div>
+    </div>
+
+    <div class="hw">
+      <div class="hw-head"><h3>المعالج الدقيق</h3></div>
+      <div class="pdf-actions">
+        <button class="pdf-btn" onclick="openPdf('micro','practical')">عملي.pdf</button>
+        <button class="pdf-btn" onclick="openPdf('micro','theory')">نظري.pdf</button>
+      </div>
+    </div>
+
+    <div class="hw">
+      <div class="hw-head"><h3>تعقيد</h3></div>
+      <div class="pdf-actions">
+        <button class="pdf-btn" onclick="openPdf('cc','practical')">عملي.pdf</button>
+        <button class="pdf-btn" onclick="openPdf('cc','theory')">نظري.pdf</button>
+      </div>
+    </div>
+
+    <div class="hw">
+      <div class="hw-head"><h3>الخوارزميات</h3></div>
+      <div class="pdf-actions">
+        <button class="pdf-btn" onclick="openPdf('algo','practical')">عملي.pdf</button>
+        <button class="pdf-btn" onclick="openPdf('algo','theory')">نظري.pdf</button>
+      </div>
+    </div>
+
+    <div class="hw">
+      <div class="hw-head"><h3>اللغة العربية</h3></div>
+      <div class="pdf-actions">
+        <button class="pdf-btn" onclick="openPdf('arabic','practical')">عملي.pdf</button>
+        <button class="pdf-btn" onclick="openPdf('arabic','theory')">نظري.pdf</button>
+      </div>
+    </div>
+
+    <div class="hw">
+      <div class="hw-head"><h3>اللغة الإنجليزية</h3></div>
+      <div class="pdf-actions">
+        <button class="pdf-btn" onclick="openPdf('english','practical')">عملي.pdf</button>
+        <button class="pdf-btn" onclick="openPdf('english','theory')">نظري.pdf</button>
+      </div>
+    </div>
+
+    <div class="hw">
+      <div class="hw-head"><h3>هندسة البرمجيات</h3></div>
+      <div class="pdf-actions">
+        <button class="pdf-btn" onclick="openPdf('se','practical')">عملي.pdf</button>
+        <button class="pdf-btn" onclick="openPdf('se','theory')">نظري.pdf</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ===== بيانات نصوص الواجبات (صفحة واحدة لكل واجب) =====
+   الشكل:
+   texts[sub].hw# = `نص`
+======================================================= */
+const texts = {
+  db: {
+    hw1:`[قواعد البيانات - واجب 1]
+مقدمة في قواعد البيانات
+
+قاعدة البيانات هي طريقة منظمة لتخزين المعلومات بحيث نستطيع البحث عنها
+وتحديثها ومشاركتها بأمان. نستخدم قواعد البيانات في كل مكان: في البنك،
+وفي الجامعة، وفي المستشفيات، وحتى في تطبيقات التواصل.
+
+DBMS هو نظام إدارة قواعد البيانات، وهو البرنامج الذي ينظم التخزين ويمنع
+الأخطاء ويحدد صلاحيات المستخدمين. من أمثلته: MySQL وPostgreSQL وSQLite.
+
+مفاهيم مهمة:
+- الجدول: يمثل كياناً مثل الطلاب
+- الصف: يمثل سجل واحد
+- العمود: يمثل خاصية مثل العمر
+- المفتاح الأساسي: رقم فريد لكل سجل
+- المفتاح الأجنبي: يربط جدولاً بجدول آخر
+
+مهمة:
+اذكر 3 أنظمة حقيقية تحتاج قاعدة بيانات ولماذا لا يكفي ملف نصّي.
+`,
+    hw2:`[قواعد البيانات - واجب 2]
+العلاقات والمفاتيح
+
+العلاقات بين الجداول تجعل قاعدة البيانات قوية. الأنواع الأساسية:
+1) واحد لواحد
+2) واحد لكثير
+3) كثير لكثير (وتحتاج جدولاً وسيطاً)
+
+المفتاح الأساسي يضمن عدم التكرار، والمفتاح الأجنبي يضمن أن الربط صحيح
+ولا توجد قيم “وهمية” لا تمثل بيانات حقيقية.
+
+مهمة:
+صمّم جدول (Students) وجدول (Departments) وحدد العلاقة والمفاتيح.
+`,
+    hw3:`[قواعد البيانات - واجب 3]
+التطبيع (Normalization)
+
+التطبيع يقلل تكرار البيانات ويمنع أخطاء الإدخال والتحديث والحذف.
+إذا كانت البيانات مكررة في أكثر من مكان، فإن أي تغيير قد يسبب تناقضاً.
+
+مهمة:
+حوّل مثالاً مثل “طالب لديه أكثر من رقم هاتف” إلى تصميم صحيح بجداول.
+`,
+    hw4:`[قواعد البيانات - واجب 4]
+الفهارس والمعاملات
+
+الفهرس (Index) يسرّع البحث لكنه يبطّئ التحديث لأنه يحتاج تحديث الفهرس أيضاً.
+المعاملات (Transactions) تجمع عدة أوامر SQL وتضمن أن العملية إما تتم بالكامل
+أو تُلغى بالكامل (rollback) لمنع فساد البيانات.
+
+مهمة:
+اشرح لماذا عملية “تحويل المال” تحتاج معاملات.
+`,
+    hw5:`[قواعد البيانات - واجب 5]
+مشروع مصغّر: نظام مكتبة
+
+صمّم قاعدة بيانات لمكتبة:
+Books(book_id,title,author,copies)
+Members(member_id,name,phone)
+Loans(loan_id,member_id,book_id,loan_date,return_date)
+
+قواعد:
+- لا يُسمح باستعارة كتاب غير موجود
+- لا تُحذف عضوية لديها استعارات فعالة
+- return_date فارغ إذا لم يرجع الكتاب
+
+مهمة:
+ارسم ER Diagram بسيط وحدد المفاتيح.
+`
+  },
+
+  micro: {
+    hw1:`[المعالج الدقيق - واجب 1]
+أنظمة العد
+
+الحاسوب يعمل بالثنائي (0 و1). نحن نستخدم العشري. السداسي عشر (Hex) مفيد
+لتمثيل الثنائي بشكل أقصر (كل 4 بت = رقم Hex).
+
+مهمة:
+حوّل 25 من عشري إلى ثنائي وHex.
+`,
+    hw2:`[المعالج الدقيق - واجب 2]
+السجلات ودورة التعليمة
+
+السجلات Registers هي ذاكرة صغيرة وسريعة داخل المعالج.
+دورة التعليمة:
+Fetch -> Decode -> Execute -> Store
+والـ Flags تسجل نتيجة العمليات (صفر، حمل، إشارة...).
+
+مهمة:
+اشرح ماذا يحدث عند تنفيذ تعليمة ADD خطوة بخطوة.
+`,
+    hw3:`[المعالج الدقيق - واجب 3]
+مقدمة في لغة التجميع
+
+Assembly قريبة من لغة الآلة وتتعامل مع السجلات مباشرة.
+أوامر مثل: MOV, ADD, SUB, CMP, JMP.
+
+مهمة:
+اكتب pseudo-assembly لعملية: (a + b) - c.
+`,
+    hw4:`[المعالج الدقيق - واجب 4]
+المقاطعات والمؤقتات
+
+Interrupts تجعل المعالج يستجيب لحدث بدون فحص مستمر (Polling).
+Timers تُستخدم للتأخير أو تشغيل حدث كل فترة زمنية.
+
+مهمة:
+اشرح الفرق بين Polling و Interrupts بمثال بسيط.
+`,
+    hw5:`[المعالج الدقيق - واجب 5]
+مشروع مصغّر: وميض LED
+
+خطوات عامة:
+تهيئة المنفذ كمخرج -> تشغيل LED -> انتظار -> إطفاء -> انتظار -> تكرار.
+الأفضل استخدام Timer Interrupt بدل delay لأنها لا توقف باقي البرنامج.
+
+مهمة:
+لماذا delay loops تعتبر سيئة في مشاريع حقيقية؟
+`
+  },
+
+  cc: {
+    hw1:`[تعقيد - واجب 1]
+نموذج فون نيومان
+
+في نموذج Von Neumann تكون التعليمات والبيانات في نفس الذاكرة.
+المعالج ينفذ دورة: جلب/فك/تنفيذ.
+
+مشكلة الاختناق (bottleneck) بسبب مشاركة نفس المسار للبيانات والتعليمات.
+
+مهمة:
+اشرح الاختناق بمثال.
+`,
+    hw2:`[تعقيد - واجب 2]
+الـ Pipeline
+
+الـ Pipeline يعني تداخل مراحل التنفيذ لزيادة عدد التعليمات المنفّذة في الزمن.
+توجد مخاطر: بيانات، تحكم (فروع)، بنية.
+
+مهمة:
+اعط مثال على Data Hazard بين تعليمتين.
+`,
+    hw3:`[تعقيد - واجب 3]
+هرمية الذاكرة
+
+Registers أسرع ثم Cache ثم RAM ثم التخزين.
+الـ Cache يعتمد على Locality لتقليل وقت الوصول.
+
+مهمة:
+اشرح لماذا الـ Cache يسرّع البرامج.
+`,
+    hw4:`[تعقيد - واجب 4]
+الدخل/الخرج و DMA
+
+أجهزة I/O أبطأ من CPU. DMA ينقل البيانات إلى الذاكرة بدون إشغال المعالج،
+خاصة عند نقل ملفات كبيرة.
+
+مهمة:
+اشرح ميزة DMA في قراءة ملف كبير من القرص.
+`,
+    hw5:`[تعقيد - واجب 5]
+مشروع مصغّر: تصميم CPU بسيط
+
+حدّد سجلات، ALU، وحدة تحكم، وتعليمات مثل MOV/ADD/SUB/JMP.
+ثم اكتب مثال برنامج صغير.
+
+مهمة:
+اكتب 5 تعليمات في “لغة” هذا المعالج.
+`
+  },
+
+  algo: {
+    hw1:`[الخوارزميات - واجب 1]
+الخوارزمية و Big-O
+
+الخوارزمية خطوات لحل مشكلة. Big-O يصف نمو الوقت مع حجم الإدخال.
+O(n) خطي، O(n^2) تربيعي، O(log n) لوغاريتمي.
+
+مهمة:
+اعط مثال على O(n) ومثال على O(n^2).
+`,
+    hw2:`[الخوارزميات - واجب 2]
+الفرز
+
+الفرز يجعل البحث أسهل.
+Bubble/Selection/Insertion سهلة لكن بطيئة غالباً (O(n^2)).
+
+مهمة:
+طبّق Bubble Sort يدوياً على [5,1,4,2] واكتب الناتج بعد كل دورة.
+`,
+    hw3:`[الخوارزميات - واجب 3]
+الاستدعاء الذاتي (Recursion)
+
+الدالة تستدعي نفسها لحل جزء أصغر.
+يجب وجود Base Case لمنع التكرار اللانهائي.
+
+مهمة:
+اكتب Recursion لحساب factorial واذكر base case.
+`,
+    hw4:`[الخوارزميات - واجب 4]
+تراكيب البيانات
+
+Stack (آخر داخل أول خارج) و Queue (أول داخل أول خارج) و Linked List.
+اختيار التركيب الصحيح يؤثر على الأداء.
+
+مهمة:
+اعط مثالين من الحياة على Stack و Queue.
+`,
+    hw5:`[الخوارزميات - واجب 5]
+الرسوم البيانية (Graphs)
+
+Graph = عقد وروابط.
+BFS يستخدم Queue ويعطي أقصر مسار في غير الموزون.
+DFS يذهب للعمق ويستخدم Stack/Recursion.
+
+مهمة:
+اشرح BFS باستخدام مثال خريطة طرق.
+`
+  },
+
+  arabic: {
+    hw1:`[اللغة العربية - واجب 1]
+أنواع الجمل
+
+الجملة الاسمية تبدأ باسم وتتكون من مبتدأ وخبر.
+الجملة الفعلية تبدأ بفعل وتتكون من فعل وفاعل وقد يأتي مفعول به.
+
+مهمة:
+اكتب 3 جمل اسمية و3 جمل فعلية وحدد أركانها.
+`,
+    hw2:`[اللغة العربية - واجب 2]
+القراءة والفهم
+
+الفهم يعتمد على استخراج الفكرة العامة والأفكار الفرعية، وفهم كلمات النص.
+التلخيص يعيد الفكرة بشكل مختصر وواضح.
+
+مهمة:
+اكتب تلخيصاً من 5 أسطر لنص تقرأه اليوم.
+`,
+    hw3:`[اللغة العربية - واجب 3]
+البلاغة
+
+التشبيه: “العلم كالنور”
+الاستعارة: “العلم نور”
+الكناية: “فلان كثير الرماد” (أي كريم)
+
+مهمة:
+اكتب مثالاً لكل نوع واشرحه.
+`,
+    hw4:`[اللغة العربية - واجب 4]
+الرسالة الرسمية
+
+تتكون من:
+التاريخ، التحية، الموضوع، نص الرسالة، الخاتمة، التوقيع.
+تكون لغة محترمة وواضحة.
+
+مهمة:
+اكتب رسالة رسمية لطلب تأجيل موعد تسليم واجب.
+`,
+    hw5:`[اللغة العربية - واجب 5]
+التعبير الكتابي
+
+فقرة جيدة = مقدمة + أفكار + خاتمة.
+استخدم علامات الترقيم والجمل الواضحة.
+
+مهمة:
+اكتب فقرة من 8 أسطر عن: “أهمية العلم في حياتنا”.
+`
+  },
+
+  english: {
+    hw1:`[اللغة الإنجليزية - واجب 1]
+Present Simple
+
+نستخدمه للعادات والحقائق:
+I study every day.
+He goes to school.
+
+مهمة:
+اكتب 5 جمل عن روتينك اليومي.
+`,
+    hw2:`[اللغة الإنجليزية - واجب 2]
+Past Simple
+
+للأحداث الماضية:
+I visited my friend yesterday.
+
+مهمة:
+اكتب 5 جمل عن يوم أمس.
+`,
+    hw3:`[اللغة الإنجليزية - واجب 3]
+Future (going to / will)
+
+going to للخطط:
+I’m going to study tonight.
+will للتوقعات والقرارات السريعة.
+
+مهمة:
+اكتب 3 جمل باستخدام going to.
+`,
+    hw4:`[اللغة الإنجليزية - واجب 4]
+Prepositions (in/on/at)
+
+in: months/years (in 2026)
+on: days (on Monday)
+at: time (at 8 o’clock)
+
+مهمة:
+املأ الفراغ: ___ Monday, ___ 8:00, ___ 2026
+`,
+    hw5:`[اللغة الإنجليزية - واجب 5]
+Paragraph Writing
+
+Topic sentence + details + conclusion.
+التنظيم أهم شيء في الفقرة.
+
+مهمة:
+اكتب فقرة عن “تعلم البرمجة” من 7 أسطر.
+`
+  },
+
+  se: {
+    hw1:`[هندسة البرمجيات - واجب 1]
+مقدمة + SDLC + المتطلبات
+
+هندسة البرمجيات ليست فقط كتابة كود، بل تخطيط وتحليل وتصميم واختبار وصيانة.
+مراحل SDLC: متطلبات -> تصميم -> تنفيذ -> اختبار -> نشر -> صيانة.
+المتطلبات نوعان: وظيفية (ميزات) وغير وظيفية (جودة: سرعة/أمان/سهولة).
+
+مهمة:
+اكتب 3 متطلبات وظيفية و2 غير وظيفية لتطبيق “متابعة الواجبات”.
+`,
+    hw2:`[هندسة البرمجيات - واجب 2]
+Waterfall vs Agile
+
+Waterfall مناسب عندما المتطلبات ثابتة.
+Agile مناسب عندما تتغير المتطلبات ونحتاج تسليم سريع وتغذية راجعة مستمرة.
+
+مهمة:
+أي نموذج أفضل لتطبيق سوشيال ميديا؟ ولماذا؟
+`,
+    hw3:`[هندسة البرمجيات - واجب 3]
+الاختبار والجودة
+
+الاختبار يمنع الأخطاء قبل وصولها للمستخدم.
+أنواع: Unit / Integration / System / Acceptance.
+كتابة Test Case وبَغ ريبورت تساعد في تنظيم عملية الجودة.
+
+مهمة:
+اكتب حالتي اختبار لصفحة تسجيل دخول.
+`,
+    hw4:`[هندسة البرمجيات - واجب 4]
+Git وإدارة النسخ
+
+Git يتتبع التغييرات ويساعد الفريق.
+الـ Branches تسمح بالعمل على ميزات بدون تدمير النسخة الرئيسية.
+
+مهمة:
+اشرح لماذا استخدام branches مهم في المشاريع.
+`,
+    hw5:`[هندسة البرمجيات - واجب 5]
+خطة مشروع مصغّر
+
+قبل البرمجة نكتب: متطلبات، تصميم واجهة، خطة اختبار، ثم نبدأ بالتنفيذ.
+التوثيق البسيط يوفر وقتاً كبيراً لاحقاً.
+
+مهمة:
+اكتب خطة من 8 نقاط لتطبيق “بوابة مواد الكلية”.
+`
+  }
+};
+
+// نصوص الكوزات (كوز لكل صف في الجدول)
+const quizzes = {
+  db: {
+    quiz1:`[قواعد البيانات - كوز 1]\nسؤال 1: ما هو المفتاح الأساسي؟\nسؤال 2: اذكر مثالاً على علاقة واحد لكثير.`,
+    quiz2:`[قواعد البيانات - كوز 2]\nسؤال 1: ما هو التطبيع؟\nسؤال 2: متى نستخدم الفهرس؟`,
+    quiz3:`[قواعد البيانات - كوز 3]\nسؤال 1: ما هو الـ JOIN؟\nسؤال 2: ما الفرق بين INNER و LEFT JOIN؟`,
+    quiz4:`[قواعد البيانات - كوز 4]\nسؤال 1: ما معنى المعاملة (Transaction)؟\nسؤال 2: مثال على ACID.`,
+    quiz5:`[قواعد البيانات - كوز 5]\nسؤال 1: ما هي Views؟\nسؤال 2: متى نستخدم Trigger؟`,
+    quiz6:`[قواعد البيانات - كوز 6]\nسؤال 1: ما الفرق بين OLTP و OLAP؟\nسؤال 2: مثال على مستودع بيانات.`
+  },
+  micro: {
+    quiz1:`[المعالج الدقيق - كوز 1]\nحوّل 13 عشري إلى ثنائي وسداسي عشر.`,
+    quiz2:`[المعالج الدقيق - كوز 2]\nاشرح دورة التعليمة Fetch/Decode/Execute.`,
+    quiz3:`[المعالج الدقيق - كوز 3]\nما وظيفة سجل Program Counter؟`,
+    quiz4:`[المعالج الدقيق - كوز 4]\nمتى نستخدم المقاطعات بدلاً من polling؟`,
+    quiz5:`[المعالج الدقيق - كوز 5]\nاكتب مثال أمر MOV و ADD.`,
+    quiz6:`[المعالج الدقيق - كوز 6]\nلماذا نستخدم Timer Interrupt في التحكم بالـ LED؟`
+  },
+  cc: {
+    quiz1:`[تعقيد - كوز 1]\nعرّف Von Neumann Bottleneck.`,
+    quiz2:`[تعقيد - كوز 2]\nما هو Data Hazard؟`,
+    quiz3:`[تعقيد - كوز 3]\nاذكر مستويات الذاكرة بالترتيب.`,
+    quiz4:`[تعقيد - كوز 4]\nما فائدة DMA؟`,
+    quiz5:`[تعقيد - كوز 5]\nاذكر مكونات CPU بسيط.`,
+    quiz6:`[تعقيد - كوز 6]\nما الفرق بين Throughput و Latency؟`
+  },
+  algo: {
+    quiz1:`[الخوارزميات - كوز 1]\nما هو Big-O لـ binary search؟`,
+    quiz2:`[الخوارزميات - كوز 2]\nكم تعقيد Bubble Sort؟`,
+    quiz3:`[الخوارزميات - كوز 3]\nما هو Base Case في recursion؟`,
+    quiz4:`[الخوارزميات - كوز 4]\nفرق بين Stack و Queue.`,
+    quiz5:`[الخوارزميات - كوز 5]\nاذكر استخدام BFS.`,
+    quiz6:`[الخوارزميات - كوز 6]\nما هو MST؟`
+  },
+  arabic: {
+    quiz1:`[اللغة العربية - كوز 1]\nعرّف الجملة الاسمية.`,
+    quiz2:`[اللغة العربية - كوز 2]\nما عناصر التلخيص الجيد؟`,
+    quiz3:`[اللغة العربية - كوز 3]\nأعط مثال استعارة.`,
+    quiz4:`[اللغة العربية - كوز 4]\nما عناصر الرسالة الرسمية؟`,
+    quiz5:`[اللغة العربية - كوز 5]\nاكتب فقرة قصيرة.`,
+    quiz6:`[اللغة العربية - كوز 6]\nما علامات الترقيم الأساسية؟`
+  },
+  english: {
+    quiz1:`[English - Quiz 1]\nWrite 3 Present Simple sentences.`,
+    quiz2:`[English - Quiz 2]\nWrite 3 Past Simple sentences.`,
+    quiz3:`[English - Quiz 3]\nUse going to in 3 sentences.`,
+    quiz4:`[English - Quiz 4]\nFill: on Monday, at 8:00, in 2026.`,
+    quiz5:`[English - Quiz 5]\nWrite a 6-line paragraph.`,
+    quiz6:`[English - Quiz 6]\nWhat is a topic sentence?`
+  },
+  se: {
+    quiz1:`[هندسة البرمجيات - كوز 1]\nاذكر مراحل SDLC.`,
+    quiz2:`[هندسة البرمجيات - كوز 2]\nفرق بين Waterfall و Agile.`,
+    quiz3:`[هندسة البرمجيات - كوز 3]\nما أنواع الاختبار؟`,
+    quiz4:`[هندسة البرمجيات - كوز 4]\nلماذا نستخدم Git branches؟`,
+    quiz5:`[هندسة البرمجيات - كوز 5]\nاكتب 3 متطلبات لتطبيق ويب.`,
+    quiz6:`[هندسة البرمجيات - كوز 6]\nما أهمية التوثيق؟`
+  }
+};
+
+// نصوص الميد تيرم
+const mids = {
+  db: {
+    mid1:`[قواعد البيانات - مد 1]\nأسئلة مراجعة المفاتيح والعلاقات.\n1) ما الفرق بين Primary و Foreign Key؟\n2) صمّم علاقة واحد-لكثير.`,
+    mid2:`[قواعد البيانات - مد 2]\n1) ما هو Normalization؟\n2) أعط مثال 3NF.`,
+    mid3:`[قواعد البيانات - مد 3]\n1) ما هو Transaction؟\n2) ما هي خصائص ACID؟`
+  },
+  micro: {
+    mid1:`[المعالج الدقيق - مد 1]\n1) اشرح دور السجلات.\n2) دورة التعليمة.`,
+    mid2:`[المعالج الدقيق - مد 2]\n1) ما الفرق بين Interrupt و Polling؟\n2) مثال Timer.`,
+    mid3:`[المعالج الدقيق - مد 3]\n1) مثال برنامج LED.\n2) لماذا تستخدم الـ Stack؟`
+  },
+  cc: {
+    mid1:`[تعقيد - مد 1]\n1) تعريف Von Neumann.\n2) مثال Bottleneck.`,
+    mid2:`[تعقيد - مد 2]\n1) ما هو Pipeline Hazard؟\n2) أنواع الـ hazards.`,
+    mid3:`[تعقيد - مد 3]\n1) مستويات الذاكرة.\n2) فائدة DMA.`
+  },
+  algo: {
+    mid1:`[الخوارزميات - مد 1]\n1) عرف Big-O.\n2) مثال على O(log n).`,
+    mid2:`[الخوارزميات - مد 2]\n1) قارن بين BFS و DFS.\n2) ما هو Stack؟`,
+    mid3:`[الخوارزميات - مد 3]\n1) ما هو MST؟\n2) اذكر خوارزمية له.`
+  },
+  arabic: {
+    mid1:`[اللغة العربية - مد 1]\n1) جملة اسمية كاملة.\n2) جملة فعلية كاملة.`,
+    mid2:`[اللغة العربية - مد 2]\n1) مثال استعارة.\n2) عناصر رسالة رسمية.`,
+    mid3:`[اللغة العربية - مد 3]\n1) اكتب فقرة 6 أسطر.\n2) ضع علامات الترقيم.`
+  },
+  english: {
+    mid1:`[English - Mid 1]\n1) Present Simple uses.\n2) Past Simple example.`,
+    mid2:`[English - Mid 2]\n1) Future (will vs going to).\n2) Prepositions in/on/at.`,
+    mid3:`[English - Mid 3]\n1) Paragraph structure.\n2) Topic sentence role.`
+  },
+  se: {
+    mid1:`[هندسة البرمجيات - مد 1]\n1) مراحل SDLC.\n2) مثال متطلبات غير وظيفية.`,
+    mid2:`[هندسة البرمجيات - مد 2]\n1) Waterfall vs Agile.\n2) ما هو Sprint؟`,
+    mid3:`[هندسة البرمجيات - مد 3]\n1) أنواع الاختبار.\n2) لماذا التوثيق مهم؟`
+  }
+};
+
+// روابط ملفات الـ PDF (استبدل القيم بروابطك الفعلية)
+const pdfLinks = {
+  db:      {practical:"عملي.pdf", theory:"نظري.pdf"},
+  micro:   {practical:"عملي.pdf", theory:"نظري.pdf"},
+  cc:      {practical:"عملي.pdf", theory:"نظري.pdf"},
+  algo:    {practical:"عملي.pdf", theory:"نظري.pdf"},
+  arabic:  {practical:"عملي.pdf", theory:"نظري.pdf"},
+  english: {practical:"عملي.pdf", theory:"نظري.pdf"},
+  se:      {practical:"عملي.pdf", theory:"نظري.pdf"},
+};
+
+/* ===== بيانات نصوص الملاحظات (صفحة ملاحظات لكل مادة) ===== */
+const notes = {
+  db:`[ملاحظات قواعد البيانات]
+- ركّز على المفاتيح الأساسية والأجنبية.
+- التطبيع مهم لتقليل التكرار.
+- راجع أمثلة SQL قبل كل اختبار.`,
+  micro:`[ملاحظات المعالج الدقيق]
+- افهم دورة التعليمة جيداً.
+- ميّز بين Polling و Interrupts.
+- تمارين التحويل بين الأنظمة مهمة.`,
+  cc:`[ملاحظات تعقيد]
+- الـ Pipeline يزيد الأداء لكنه يسبب مخاطر.
+- الـ Cache يعتمد على locality.
+- راجع DMA ومزاياه.`,
+  algo:`[ملاحظات الخوارزميات]
+- احفظ تعقيدات Big-O الأساسية.
+- طبّق الفرز خطوة بخطوة.
+- فرق بين BFS و DFS.`,
+  arabic:`[ملاحظات اللغة العربية]
+- فرّق بين الجملة الاسمية والفعلية.
+- اهتم بعلامات الترقيم في التعبير.
+- البلاغة أمثلة كثيرة، احفظ نوعين على الأقل.`,
+  english:`[ملاحظات اللغة الإنجليزية]
+- راجع قواعد الأزمنة الأساسية.
+- احفظ حروف الجر in/on/at.
+- اكتب فقرة قصيرة يومياً للتدريب.`,
+  se:`[ملاحظات هندسة البرمجيات]
+- ركّز على SDLC.
+- افهم الفرق بين Waterfall و Agile.
+- راجع أنواع الاختبار.`,
+};
+
+/* تعبئة الملاحظات مباشرة داخل الصفحة */
+function renderNotesInline(){
+  document.querySelectorAll(".note-body").forEach(el=>{
+    const sub = el.dataset.sub;
+    const text = notes?.[sub] ?? "لا توجد ملاحظات بعد لهذه المادة.";
+    el.textContent = text;
+  });
+}
+renderNotesInline();
+
+/* ================== NAVIGATION ================== */
+function openSub(id){
+  document.getElementById("home").classList.add("hidden");
+  document.querySelectorAll(".subject").forEach(s=>s.classList.remove("active"));
+  document.getElementById(id).classList.add("active");
+}
+function goHome(){
+  document.getElementById("home").classList.remove("hidden");
+  document.querySelectorAll(".subject").forEach(s=>s.classList.remove("active"));
+}
+
+/* ================== VIEWER ================== */
+function openText(title, text){
+  document.getElementById("textTitle").textContent = title;
+  document.getElementById("textBody").textContent = text;
+  document.getElementById("textViewer").classList.remove("hidden");
+}
+function closeText(){
+  document.getElementById("textViewer").classList.add("hidden");
+  document.getElementById("textTitle").textContent = "";
+  document.getElementById("textBody").textContent = "";
+}
+document.addEventListener("click", (e)=>{
+  const viewer = document.getElementById("textViewer");
+  if (!viewer.classList.contains("hidden") && e.target === viewer) closeText();
+});
+document.addEventListener("keydown", (e)=>{
+  if (e.key === "Escape") closeText();
+});
+
+/* ================== SECTION TOGGLE ================== */
+function toggleSection(btn){
+  const card = btn.closest(".section-card");
+  if (!card) return;
+  const isOpen = card.classList.toggle("open");
+  btn.textContent = isOpen ? "إخفاء" : "عرض";
+}
+
+/* ================== OPEN HW DIRECTLY ================== */
+function openHW(btn){
+  const hwBox = btn.closest(".hw");
+  const sub = hwBox.dataset.sub;
+  const hwNum = hwBox.dataset.hw;
+
+  const titleMap = {
+    db:"قواعد البيانات",
+    micro:"المعالج الدقيق",
+    cc:"تعقيد",
+    algo:"الخوارزميات",
+    arabic:"اللغة العربية",
+    english:"اللغة الإنجليزية",
+    se:"هندسة البرمجيات"
+  };
+
+  const title = `${titleMap[sub]} - الواجب ${hwNum}`;
+  const text = texts?.[sub]?.[`hw${hwNum}`] ?? `لا يوجد محتوى بعد لهذا الواجب.`;
+
+  openText(title, text);
+}
+
+/* ================== OPEN NOTES ================== */
+function openNote(btn){
+  const noteBox = btn.closest(".note");
+  const sub = noteBox.dataset.sub;
+
+  const titleMap = {
+    db:"قواعد البيانات",
+    micro:"المعالج الدقيق",
+    cc:"تعقيد",
+    algo:"الخوارزميات",
+    arabic:"اللغة العربية",
+    english:"اللغة الإنجليزية",
+    se:"هندسة البرمجيات"
+  };
+
+  const title = `${titleMap[sub]} - الملاحظات`;
+  const text = notes?.[sub] ?? `لا توجد ملاحظات بعد لهذه المادة.`;
+
+  openText(title, text);
+}
+
+/* ================== OPEN QUIZ (جعل الكوز مثل الواجب) ================== */
+function openQuiz(btn){
+  const sub = btn.dataset.sub;
+  const quizNum = btn.dataset.quiz;
+
+  const titleMap = {
+    db:"قواعد البيانات",
+    micro:"المعالج الدقيق",
+    cc:"تعقيد",
+    algo:"الخوارزميات",
+    arabic:"اللغة العربية",
+    english:"اللغة الإنجليزية",
+    se:"هندسة البرمجيات"
+  };
+
+  const title = `${titleMap[sub]} - كوز ${quizNum}`;
+  const text = quizzes?.[sub]?.[`quiz${quizNum}`] ?? `لا يوجد محتوى بعد لهذا الكوز.`;
+  openText(title, text);
+}
+
+/* ================== OPEN MID (جعل الميد مثل الواجب) ================== */
+function openMid(btn){
+  const sub = btn.dataset.sub;
+  const midNum = btn.dataset.mid;
+
+  const titleMap = {
+    db:"قواعد البيانات",
+    micro:"المعالج الدقيق",
+    cc:"تعقيد",
+    algo:"الخوارزميات",
+    arabic:"اللغة العربية",
+    english:"اللغة الإنجليزية",
+    se:"هندسة البرمجيات"
+  };
+
+  const title = `${titleMap[sub]} - مد ${midNum}`;
+  const text = mids?.[sub]?.[`mid${midNum}`] ?? `لا يوجد محتوى بعد لهذا المد.`;
+  openText(title, text);
+}
+
+/* ================== OPEN PDF ================== */
+function openPdf(sub, kind){
+  const titleMap = {
+    db:"قواعد البيانات",
+    micro:"المعالج الدقيق",
+    cc:"تعقيد",
+    algo:"الخوارزميات",
+    arabic:"اللغة العربية",
+    english:"اللغة الإنجليزية",
+    se:"هندسة البرمجيات"
+  };
+
+  const kindLabel = kind === "practical" ? "عملي.pdf" : "نظري.pdf";
+  const link = pdfLinks?.[sub]?.[kind];
+
+  if(link && link !== "#"){
+    const viewer = document.getElementById("pdfViewer");
+    const embed = document.getElementById("pdfEmbed");
+    document.getElementById("pdfTitle").textContent = `${titleMap[sub]} - ${kindLabel}`;
+    embed.src = link;
+    viewer.classList.remove("hidden");
+  }else{
+    const msg = `لم يتم إضافة رابط بعد لملف ${kindLabel} في ${titleMap[sub]}.\nضع الرابط في كائن pdfLinks داخل السكربت.`;
+    openText(`${titleMap[sub]} - ${kindLabel}`, msg);
+  }
+}
+
+function closePdf(){
+  const viewer = document.getElementById("pdfViewer");
+  const embed = document.getElementById("pdfEmbed");
+  embed.src = "";
+  viewer.classList.add("hidden");
+}
+
+document.addEventListener("click", (e)=>{
+  const pdfV = document.getElementById("pdfViewer");
+  if (!pdfV.classList.contains("hidden") && e.target === pdfV) closePdf();
+});
+document.addEventListener("keydown", (e)=>{
+  if (e.key === "Escape") closePdf();
+});
+</script>
+
+</body>
+</html>
