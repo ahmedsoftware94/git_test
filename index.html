@@ -1685,12 +1685,38 @@ const notes = {
 - راجع أنواع الاختبار.`,
 };
 
+const EMPTY_PAGE_TEXT = "this page is empty";
+const ENGLISH_HW1_TEXT = `الأفعال الماضية في النص هي:
+
+1. was
+2. woke
+3. were
+4. heard
+5. saw
+6. went
+7. found
+8. asked
+9. told
+10. believed
+11. showed
+12. said
+13. had
+14. carried
+15. kept
+16. took
+17. gave
+18. left
+19. held
+20. didn’t know
+21. got
+22. thought
+23. caught
+`;
+
 /* تعبئة الملاحظات مباشرة داخل الصفحة */
 function renderNotesInline(){
   document.querySelectorAll(".note-body").forEach(el=>{
-    const sub = el.dataset.sub;
-    const text = notes?.[sub] ?? "لا توجد ملاحظات بعد لهذه المادة.";
-    el.textContent = text;
+    el.textContent = EMPTY_PAGE_TEXT;
   });
 }
 renderNotesInline();
@@ -1750,7 +1776,9 @@ function openHW(btn){
   };
 
   const title = `${titleMap[sub]} - الواجب ${hwNum}`;
-  const text = texts?.[sub]?.[`hw${hwNum}`] ?? `لا يوجد محتوى بعد لهذا الواجب.`;
+  const text = (sub === "english" && hwNum === "1")
+    ? ENGLISH_HW1_TEXT
+    : EMPTY_PAGE_TEXT;
 
   openText(title, text);
 }
@@ -1771,7 +1799,7 @@ function openNote(btn){
   };
 
   const title = `${titleMap[sub]} - الملاحظات`;
-  const text = notes?.[sub] ?? `لا توجد ملاحظات بعد لهذه المادة.`;
+  const text = EMPTY_PAGE_TEXT;
 
   openText(title, text);
 }
