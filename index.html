@@ -1712,6 +1712,76 @@ const ENGLISH_HW1_TEXT = `الأفعال الماضية في النص هي:
 22. thought
 23. caught
 `;
+const ALGO_HW1_TEXT = `#include <iostream>
+using namespace std;
+
+/* ========= 1) Factorial ========= */
+long long factorial(int n) {
+    if (n < 0) return -1;
+    if (n == 0 || n == 1) return 1;
+    return n * factorial(n - 1);
+}
+
+/* ========= 2) Power ========= */
+long long power(long long base, int exp) {
+    if (exp == 0) return 1;
+    return base * power(base, exp - 1);
+}
+
+/* ========= 3) Sequence ========= */
+void sequence(int a, int b) {
+    if (a > 100) return;
+    cout << a << " ";
+    sequence(b, a + b);
+}
+
+/* ========= Main Menu ========= */
+int main() {
+    int choice;
+
+    cout << "Choose program:\\n";
+    cout << "1) Factorial\\n";
+    cout << "2) Power\\n";
+    cout << "3) Sequence to 100\\n";
+    cout << "Enter choice: ";
+    cin >> choice;
+
+    if (choice == 1) {
+        int n;
+        cout << "Enter number: ";
+        cin >> n;
+
+        long long result = factorial(n);
+        if (result == -1)
+            cout << "Not defined for negative numbers\\n";
+        else
+            cout << n << "! = " << result << endl;
+    }
+
+    else if (choice == 2) {
+        long long base;
+        int exp;
+
+        cout << "Enter base: ";
+        cin >> base;
+        cout << "Enter exponent: ";
+        cin >> exp;
+
+        cout << base << "^" << exp << " = " << power(base, exp) << endl;
+    }
+
+    else if (choice == 3) {
+        sequence(1, 2);
+        cout << endl;
+    }
+
+    else {
+        cout << "Invalid choice\\n";
+    }
+
+    return 0;
+}
+`;
 
 /* تعبئة الملاحظات مباشرة داخل الصفحة */
 function renderNotesInline(){
@@ -1778,7 +1848,9 @@ function openHW(btn){
   const title = `${titleMap[sub]} - الواجب ${hwNum}`;
   const text = (sub === "english" && hwNum === "1")
     ? ENGLISH_HW1_TEXT
-    : EMPTY_PAGE_TEXT;
+    : (sub === "algo" && hwNum === "1")
+      ? ALGO_HW1_TEXT
+      : EMPTY_PAGE_TEXT;
 
   openText(title, text);
 }
