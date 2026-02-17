@@ -427,14 +427,58 @@ a.pdf-btn{
 }
 
 @media(max-width:767px){
+  .subject.active{
+    grid-template-columns:1fr;
+  }
   .section-card.open .section-content{
     text-align:center;
   }
-  .section-card.open .hw-head{
+  .section-card.open .section-content > *{
+    margin-inline:auto;
+  }
+  .section-card.open .table-wrap{
+    width:100%;
+    overflow-x:hidden;
+  }
+  .section-card.open table{
+    width:100%;
+    min-width:0;
+    table-layout:fixed;
+  }
+  .section-card.open th,
+  .section-card.open td{
+    padding:8px 6px;
+    font-size:14px;
+    word-break:break-word;
+  }
+  .section-card.open .table-wrap table th:last-child,
+  .section-card.open .table-wrap table td:last-child{
+    width:auto;
+    white-space:normal;
+  }
+  .section-card.open .hw-head,
+  .section-card.open .note-head{
     justify-content:center;
+    flex-direction:column;
+    text-align:center;
   }
   .section-card.open .pdf-actions{
     justify-content:center;
+  }
+  .section-card.open .toggle,
+  .section-card.open .pdf-btn,
+  .section-card.open .table-btn{
+    margin-inline:auto;
+  }
+  .section-card.open .table-btn{
+    width:100%;
+    max-width:100%;
+    min-width:0;
+    padding:10px 8px;
+    font-size:14px;
+  }
+  .section-card.open .note-body{
+    text-align:center;
   }
 }
 
