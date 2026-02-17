@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JavaScript Workspace</title>
+<style>
+:root {
+  --bg: #eaf4ff;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #475569;
+  --accent: #0f766e;
+  --accent-dark: #115e59;
+  --line: #dbeafe;
+  --out-bg: #0b1020;
+  --out-text: #e2e8f0;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 15% 10%, #bae6fd 0%, transparent 35%), var(--bg);
+  color: var(--ink);
+}
+header {
+  background: #0f172a;
+  color: #fff;
+  padding: 16px;
+}
+header h1 { margin: 0; font-size: 22px; }
+header p { margin: 8px 0 0; color: #cbd5e1; }
+.wrap { width: min(1120px, 94%); margin: 20px auto; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+button,
+.link-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+}
+button:hover,
+.link-btn:hover { background: var(--accent-dark); }
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 22px rgba(2, 6, 23, 0.08);
+}
+.panel h2 { margin: 0 0 10px; font-size: 18px; }
+#fileInfo { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+#editor {
+  width: 100%;
+  min-height: 380px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+}
+#output {
+  margin: 0;
+  min-height: 300px;
+  background: var(--out-bg);
+  color: var(--out-text);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: "Consolas", "Courier New", monospace;
+  white-space: pre-wrap;
+  overflow: auto;
+}
+.meta { margin-top: 8px; color: var(--muted); font-size: 14px; }
+@media (min-width: 980px) {
+  .layout { grid-template-columns: 1.2fr 0.8fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">JavaScript Workspace</h1>
+  <p>Run JavaScript directly in browser.</p>
+</header>
+
+<div class="wrap">
+  <div class="toolbar">
+    <a class="link-btn" href="../index.html">Back To Subjects</a>
+    <button id="runBtn" type="button">Run Code</button>
+    <button id="clearBtn" type="button">Clear Output</button>
+    <button id="resetBtn" type="button">Reset Source</button>
+    <button id="downloadBtn" type="button">Download .js</button>
+  </div>
+
+  <div class="layout">
+    <section class="panel">
+      <h2>Editor</h2>
+      <p id="fileInfo">Source: programs/program-1.js</p>
+      <textarea id="editor" spellcheck="false"></textarea>
+      <div class="meta" id="status">Tip: Press Ctrl+Enter to run JavaScript.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Output</h2>
+      <pre id="output">[output will appear here]</pre>
+    </section>
+  </div>
+</div>
+
+<script>
+const DEFAULT_CODE = `function sum(a, b) {\n  return a + b;\n}\n\nconsole.log("sum(2, 3) =", sum(2, 3));`;
+
+const params = new URLSearchParams(window.location.search);
+const file = params.get("file") || "programs/program-1.js";
+const title = params.get("title") || "JavaScript Program";
+const storageKey = `js_workspace:${file}`;
+
+const editor = document.getElementById("editor");
+const output = document.getElementById("output");
+const statusEl = document.getElementById("status");
+
+document.getElementById("title").textContent = title;
+document.getElementById("fileInfo").textContent = `Source: ${file}`;
+
+let sourceCode = DEFAULT_CODE;
+
+function setStatus(msg) {
+  statusEl.textContent = msg;
+}
+
+function stringify(value) {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function runCode() {
+  const lines = [];
+  const fakeConsole = {
+    log: (...args) => lines.push(args.map(stringify).join(" ")),
+    info: (...args) => lines.push(`[info] ${args.map(stringify).join(" ")}`),
+    warn: (...args) => lines.push(`[warn] ${args.map(stringify).join(" ")}`),
+    error: (...args) => lines.push(`[error] ${args.map(stringify).join(" ")}`)
+  };
+
+  try {
+    const runner = new Function("console", `"use strict";\n${editor.value}`);
+    runner(fakeConsole);
+    output.textContent = lines.length ? lines.join("\n") : "[no output]";
+    setStatus("Executed successfully.");
+  } catch (err) {
+    output.textContent = `${lines.join("\n")}\n[exception] ${err.name}: ${err.message}`.trim();
+    setStatus("Execution failed.");
+  }
+
+  localStorage.setItem(storageKey, editor.value);
+}
+
+function clearOutput() {
+  output.textContent = "[output cleared]";
+  setStatus("Output cleared.");
+}
+
+function resetSource() {
+  editor.value = sourceCode;
+  localStorage.setItem(storageKey, editor.value);
+  setStatus("Editor reset to source file.");
+}
+
+function downloadCode() {
+  const blob = new Blob([editor.value], { type: "text/javascript" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.split("/").pop() || "program.js";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  setStatus(`Downloaded ${a.download}`);
+}
+
+async function loadSource() {
+  try {
+    const res = await fetch(file, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    sourceCode = await res.text();
+  } catch {
+    sourceCode = DEFAULT_CODE;
+  }
+}
+
+async function init() {
+  await loadSource();
+  const saved = localStorage.getItem(storageKey);
+  editor.value = saved ?? sourceCode;
+}
+
+editor.addEventListener("input", () => {
+  localStorage.setItem(storageKey, editor.value);
+});
+
+editor.addEventListener("keydown", (event) => {
+  if (event.ctrlKey && event.key === "Enter") {
+    event.preventDefault();
+    runCode();
+  }
+});
+
+document.getElementById("runBtn").addEventListener("click", runCode);
+document.getElementById("clearBtn").addEventListener("click", clearOutput);
+document.getElementById("resetBtn").addEventListener("click", resetSource);
+document.getElementById("downloadBtn").addEventListener("click", downloadCode);
+
+init();
+</script>
+</body>
+</html>

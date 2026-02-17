@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SE Python Workspace</title>
+<style>
+:root {
+  --bg: #f3fff8;
+  --panel: #ffffff;
+  --ink: #0f172a;
+  --muted: #475569;
+  --accent: #166534;
+  --accent-dark: #14532d;
+  --line: #bbf7d0;
+  --out-bg: #06251a;
+  --out-text: #d1fae5;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 10% 8%, #bbf7d0 0%, transparent 35%), var(--bg);
+  color: var(--ink);
+}
+header {
+  background: #14532d;
+  color: #fff;
+  padding: 16px;
+}
+header h1 { margin: 0; font-size: 22px; }
+header p { margin: 8px 0 0; color: #bbf7d0; }
+.wrap { width: min(1120px, 94%); margin: 20px auto; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+button,
+.link-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+}
+button:hover,
+.link-btn:hover { background: var(--accent-dark); }
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+}
+.panel h2 { margin: 0 0 10px; font-size: 18px; }
+#fileInfo { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+#editor {
+  width: 100%;
+  min-height: 380px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+}
+#output {
+  margin: 0;
+  min-height: 300px;
+  background: var(--out-bg);
+  color: var(--out-text);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: "Consolas", "Courier New", monospace;
+  white-space: pre-wrap;
+  overflow: auto;
+}
+.meta { margin-top: 8px; color: var(--muted); font-size: 14px; }
+@media (min-width: 980px) {
+  .layout { grid-template-columns: 1.2fr 0.8fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Software Engineering Python Workspace</h1>
+  <p>Run Python in browser (Pyodide) + quality checks for assignment structure.</p>
+</header>
+
+<div class="wrap">
+  <div class="toolbar">
+    <a class="link-btn" href="index.html">Back To Subjects</a>
+    <button id="runBtn" type="button">Run Python</button>
+    <button id="analyzeBtn" type="button">Analyze Quality</button>
+    <button id="clearBtn" type="button">Clear Output</button>
+    <button id="resetBtn" type="button">Reset Source</button>
+    <button id="downloadBtn" type="button">Download .py</button>
+  </div>
+
+  <div class="layout">
+    <section class="panel">
+      <h2>Python Editor</h2>
+      <p id="fileInfo">Source: se-practice/programs/program-1.py</p>
+      <textarea id="editor" spellcheck="false"></textarea>
+      <div class="meta" id="status">Tip: Ctrl+Enter to run Python.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Output / Quality Report</h2>
+      <pre id="output">[output or report will appear here]</pre>
+    </section>
+  </div>
+</div>
+
+<script>
+const DEFAULT_PY = `def add(a, b):\n    return a + b\n\nif __name__ == '__main__':\n    print(add(2, 3))`;
+const PYODIDE_VERSION = "0.26.4";
+const PYODIDE_LOAD_TIMEOUT_MS = 45000;
+const PYTHON_RUN_TIMEOUT_MS = 15000;
+
+const params = new URLSearchParams(window.location.search);
+const file = params.get("file") || "se-practice/programs/program-1.py";
+const title = params.get("title") || "Python Program";
+const storageKey = `se_workspace:${file}`;
+
+const editor = document.getElementById("editor");
+const output = document.getElementById("output");
+const statusEl = document.getElementById("status");
+const runBtn = document.getElementById("runBtn");
+
+document.getElementById("title").textContent = title;
+document.getElementById("fileInfo").textContent = `Source: ${file}`;
+
+let sourceCode = DEFAULT_PY;
+let pyodideInstance = null;
+let running = false;
+
+function setStatus(msg) {
+  statusEl.textContent = msg;
+}
+
+function countMatches(text, regex) {
+  const matches = text.match(regex);
+  return matches ? matches.length : 0;
+}
+
+function withTimeout(promise, timeoutMs, timeoutMessage) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    promise.then((value) => {
+      clearTimeout(timer);
+      resolve(value);
+    }).catch((error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
+function loadExternalScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = [...document.scripts].find((s) => s.src === src);
+    if (existing) {
+      if (existing.dataset.loaded === "1") {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error(`Failed to load: ${src}`)), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.addEventListener("load", () => {
+      script.dataset.loaded = "1";
+      resolve();
+    }, { once: true });
+    script.addEventListener("error", () => reject(new Error(`Failed to load: ${src}`)), { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+async function ensurePyodide() {
+  if (pyodideInstance) return pyodideInstance;
+
+  setStatus("Loading Python runtime (Pyodide)...");
+  const baseUrl = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+
+  if (!window.loadPyodide) {
+    await withTimeout(
+      loadExternalScript(`${baseUrl}pyodide.js`),
+      PYODIDE_LOAD_TIMEOUT_MS,
+      "Timed out while loading pyodide.js. Check internet or content blockers."
+    );
+  }
+
+  pyodideInstance = await withTimeout(
+    window.loadPyodide({ indexURL: baseUrl }),
+    PYODIDE_LOAD_TIMEOUT_MS,
+    "Timed out while initializing Python runtime."
+  );
+  setStatus("Python runtime is ready.");
+  return pyodideInstance;
+}
+
+async function runPython() {
+  if (running) return;
+  const code = editor.value;
+  running = true;
+  runBtn.disabled = true;
+  output.textContent = "[running python ...]";
+
+  try {
+    const pyodide = await ensurePyodide();
+    pyodide.globals.set("USER_CODE", code);
+
+    const result = await withTimeout(pyodide.runPythonAsync(`
+import io
+import sys
+import traceback
+import builtins
+
+def _blocked_input(*args, **kwargs):
+    raise RuntimeError("input() is not supported in browser runner. Use fixed test values.")
+
+builtins.input = _blocked_input
+
+_stdout = io.StringIO()
+_stderr = io.StringIO()
+_old_stdout, _old_stderr = sys.stdout, sys.stderr
+sys.stdout, sys.stderr = _stdout, _stderr
+
+try:
+    namespace = {"__name__": "__main__"}
+    exec(USER_CODE, namespace)
+except Exception:
+    traceback.print_exc()
+finally:
+    sys.stdout, sys.stderr = _old_stdout, _old_stderr
+
+out = _stdout.getvalue()
+err = _stderr.getvalue()
+(out + ("\\n" if out and err else "") + err).strip()
+`), PYTHON_RUN_TIMEOUT_MS, "Execution timed out. Remove input() or long/infinite loops.");
+
+    output.textContent = String(result || "[no output]");
+    setStatus("Python executed successfully.");
+  } catch (err) {
+    output.textContent = `[runtime error] ${err && err.message ? err.message : String(err)}`;
+    setStatus("Python run failed.");
+  } finally {
+    if (pyodideInstance) {
+      try { pyodideInstance.globals.delete("USER_CODE"); } catch {}
+    }
+    localStorage.setItem(storageKey, code);
+    running = false;
+    runBtn.disabled = false;
+  }
+}
+
+function analyzeQuality() {
+  const code = editor.value;
+  const functionCount = countMatches(code, /^\s*def\s+\w+\s*\(/gm);
+  const classCount = countMatches(code, /^\s*class\s+\w+/gm);
+  const todoCount = countMatches(code, /TODO|FIXME/gi);
+  const hasMain = /if\s+__name__\s*==\s*['"]__main__['"]\s*:/.test(code);
+
+  const longLines = code
+    .split("\n")
+    .map((line, i) => ({ number: i + 1, len: line.length }))
+    .filter((x) => x.len > 100);
+
+  const report = [];
+  report.push(`Functions: ${functionCount}`);
+  report.push(`Classes: ${classCount}`);
+  report.push(`TODO/FIXME markers: ${todoCount}`);
+  report.push(`Main entry guard: ${hasMain ? "YES" : "NO"}`);
+  report.push("");
+
+  if (longLines.length) {
+    report.push("Lines longer than 100 chars:");
+    longLines.forEach((x) => report.push(`- line ${x.number}: ${x.len} chars`));
+  } else {
+    report.push("No long lines over 100 chars.");
+  }
+
+  report.push("");
+  report.push("Recommendations:");
+  if (!hasMain) report.push("- Add if __name__ == '__main__': for runnable scripts.");
+  if (!functionCount) report.push("- Add functions to improve modular design.");
+  if (todoCount) report.push("- Resolve TODO/FIXME before final submit.");
+  if (hasMain && functionCount && !todoCount) report.push("- Structure is good for a practical assignment.");
+
+  output.textContent = report.join("\n");
+  setStatus("Quality analysis completed.");
+  localStorage.setItem(storageKey, code);
+}
+
+function clearOutput() {
+  output.textContent = "[output cleared]";
+  setStatus("Output cleared.");
+}
+
+function resetSource() {
+  editor.value = sourceCode;
+  localStorage.setItem(storageKey, editor.value);
+  setStatus("Editor reset to source file.");
+}
+
+function downloadCode() {
+  const blob = new Blob([editor.value], { type: "text/x-python" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.split("/").pop() || "program.py";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  setStatus(`Downloaded ${a.download}`);
+}
+
+async function loadSource() {
+  try {
+    const res = await fetch(file, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    sourceCode = await res.text();
+  } catch {
+    sourceCode = DEFAULT_PY;
+  }
+}
+
+async function init() {
+  await loadSource();
+  const saved = localStorage.getItem(storageKey);
+  editor.value = saved ?? sourceCode;
+}
+
+editor.addEventListener("input", () => {
+  localStorage.setItem(storageKey, editor.value);
+});
+
+editor.addEventListener("keydown", (event) => {
+  if (event.ctrlKey && event.key === "Enter") {
+    event.preventDefault();
+    runPython();
+  }
+});
+
+runBtn.addEventListener("click", runPython);
+document.getElementById("analyzeBtn").addEventListener("click", analyzeQuality);
+document.getElementById("clearBtn").addEventListener("click", clearOutput);
+document.getElementById("resetBtn").addEventListener("click", resetSource);
+document.getElementById("downloadBtn").addEventListener("click", downloadCode);
+
+init();
+</script>
+</body>
+</html>

@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Oracle SQL Workspace</title>
+<style>
+:root {
+  --bg: #fff7ed;
+  --panel: #ffffff;
+  --ink: #1f2937;
+  --muted: #6b7280;
+  --accent: #b45309;
+  --accent-dark: #92400e;
+  --line: #fed7aa;
+  --out-bg: #1c1917;
+  --out-text: #fde68a;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 90% 10%, #ffedd5 0%, transparent 35%), var(--bg);
+  color: var(--ink);
+}
+header {
+  background: #7c2d12;
+  color: #fff;
+  padding: 16px;
+}
+header h1 { margin: 0; font-size: 22px; }
+header p { margin: 8px 0 0; color: #fde68a; }
+.wrap { width: min(1120px, 94%); margin: 20px auto; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+button,
+.link-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+}
+button:hover,
+.link-btn:hover { background: var(--accent-dark); }
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+}
+.panel h2 { margin: 0 0 10px; font-size: 18px; }
+#fileInfo { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+#editor {
+  width: 100%;
+  min-height: 380px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+}
+#output {
+  margin: 0;
+  min-height: 300px;
+  background: var(--out-bg);
+  color: var(--out-text);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: "Consolas", "Courier New", monospace;
+  white-space: pre-wrap;
+  overflow: auto;
+}
+.meta { margin-top: 8px; color: var(--muted); font-size: 14px; }
+@media (min-width: 980px) {
+  .layout { grid-template-columns: 1.2fr 0.8fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Oracle SQL Workspace</h1>
+  <p>Run SQL in browser using SQLite compatibility mode + script analysis.</p>
+</header>
+
+<div class="wrap">
+  <div class="toolbar">
+    <a class="link-btn" href="index.html">Back To Subjects</a>
+    <button id="runBtn" type="button">Run SQL</button>
+    <button id="analyzeBtn" type="button">Analyze Script</button>
+    <button id="resetDbBtn" type="button">Reset In-Memory DB</button>
+    <button id="clearBtn" type="button">Clear Output</button>
+    <button id="resetBtn" type="button">Reset Source</button>
+    <button id="downloadBtn" type="button">Download .sql</button>
+  </div>
+
+  <div class="layout">
+    <section class="panel">
+      <h2>Oracle SQL Editor</h2>
+      <p id="fileInfo">Source: db-practice/programs/program-1.sql</p>
+      <textarea id="editor" spellcheck="false"></textarea>
+      <div class="meta" id="status">Tip: execution runs in SQLite compatibility mode (not full Oracle server).</div>
+    </section>
+
+    <section class="panel">
+      <h2>Execution / Analysis Output</h2>
+      <pre id="output">[output will appear here]</pre>
+    </section>
+  </div>
+</div>
+
+<script>
+const DEFAULT_SQL = `CREATE TABLE students (\n  id NUMBER PRIMARY KEY,\n  name VARCHAR2(100)\n);\n\nINSERT INTO students (id, name) VALUES (1, 'Ali');\nINSERT INTO students (id, name) VALUES (2, 'Sara');\n\nSELECT * FROM students;`;
+const SQLJS_VERSION = "1.10.3";
+
+const params = new URLSearchParams(window.location.search);
+const file = params.get("file") || "db-practice/programs/program-1.sql";
+const title = params.get("title") || "Oracle Program";
+const storageKey = `db_workspace:${file}`;
+
+const editor = document.getElementById("editor");
+const output = document.getElementById("output");
+const statusEl = document.getElementById("status");
+
+document.getElementById("title").textContent = title;
+document.getElementById("fileInfo").textContent = `Source: ${file}`;
+
+let sourceCode = DEFAULT_SQL;
+let SQL = null;
+let database = null;
+let sqlRuntimePromise = null;
+
+function setStatus(msg) {
+  statusEl.textContent = msg;
+}
+
+function loadExternalScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = [...document.scripts].find((s) => s.src === src);
+    if (existing) {
+      if (existing.dataset.loaded === "1") {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error(`Failed to load: ${src}`)), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.addEventListener("load", () => {
+      script.dataset.loaded = "1";
+      resolve();
+    }, { once: true });
+    script.addEventListener("error", () => reject(new Error(`Failed to load: ${src}`)), { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+async function ensureSqlRuntime() {
+  if (database) return database;
+  if (sqlRuntimePromise) return sqlRuntimePromise;
+
+  sqlRuntimePromise = (async () => {
+    setStatus("Loading SQL runtime (sql.js)...");
+
+    const baseUrl = `https://cdnjs.cloudflare.com/ajax/libs/sql.js/${SQLJS_VERSION}/`;
+    if (!window.initSqlJs) {
+      await loadExternalScript(`${baseUrl}sql-wasm.js`);
+    }
+
+    SQL = await window.initSqlJs({
+      locateFile: (name) => `${baseUrl}${name}`
+    });
+
+    database = new SQL.Database();
+    setStatus("SQL runtime ready (SQLite compatibility mode).");
+    return database;
+  })();
+
+  try {
+    return await sqlRuntimePromise;
+  } catch (err) {
+    sqlRuntimePromise = null;
+    throw err;
+  }
+}
+
+function splitStatements(sql) {
+  const statements = [];
+  let current = "";
+  let inSingle = false;
+  let inDouble = false;
+
+  for (let i = 0; i < sql.length; i += 1) {
+    const ch = sql[i];
+    const next = sql[i + 1];
+
+    if (ch === "'" && !inDouble) {
+      if (inSingle && next === "'") {
+        current += "''";
+        i += 1;
+        continue;
+      }
+      inSingle = !inSingle;
+      current += ch;
+      continue;
+    }
+
+    if (ch === '"' && !inSingle) {
+      inDouble = !inDouble;
+      current += ch;
+      continue;
+    }
+
+    if (ch === ";" && !inSingle && !inDouble) {
+      const cleaned = current.trim();
+      if (cleaned) statements.push(cleaned);
+      current = "";
+      continue;
+    }
+
+    current += ch;
+  }
+
+  const tail = current.trim();
+  if (tail) statements.push(tail);
+  return statements;
+}
+
+function firstKeyword(statement) {
+  const match = statement.match(/^([a-zA-Z]+)/);
+  return match ? match[1].toUpperCase() : "UNKNOWN";
+}
+
+function toSqliteCompatible(sql) {
+  return sql
+    .replace(/\bFROM\s+dual\b/gi, "")
+    .replace(/\bNVL\s*\(/gi, "IFNULL(")
+    .replace(/\bSYSDATE\b/gi, "CURRENT_TIMESTAMP");
+}
+
+function valueToText(value) {
+  if (value === null || value === undefined) return "NULL";
+  return String(value);
+}
+
+function renderTable(resultSet) {
+  const rows = [resultSet.columns, ...resultSet.values.map((row) => row.map(valueToText))];
+  const widths = resultSet.columns.map((_, i) => {
+    return rows.reduce((max, row) => Math.max(max, String(row[i]).length), 0);
+  });
+
+  const formatRow = (row) => row.map((cell, i) => String(cell).padEnd(widths[i], " ")).join(" | ");
+  const separator = widths.map((w) => "-".repeat(w)).join("-+-");
+
+  const lines = [formatRow(rows[0]), separator];
+  rows.slice(1).forEach((row) => lines.push(formatRow(row)));
+
+  return lines.join("\n");
+}
+
+async function runSql() {
+  const sqlText = editor.value;
+  output.textContent = "[running sql ...]";
+
+  try {
+    const db = await ensureSqlRuntime();
+    const compatibleSql = toSqliteCompatible(sqlText);
+    const statements = splitStatements(compatibleSql);
+
+    if (!statements.length) {
+      output.textContent = "No SQL statements found.";
+      setStatus("Add SQL statements then run again.");
+      return;
+    }
+
+    const blocks = ["[SQLite compatibility mode for Oracle practice]"];
+    let hasError = false;
+
+    statements.forEach((stmt, index) => {
+      if (hasError) return;
+
+      const keyword = firstKeyword(stmt);
+      try {
+        const results = db.exec(stmt);
+
+        if (results.length) {
+          blocks.push(`Statement ${index + 1} (${keyword}) result:`);
+          results.forEach((set, setIndex) => {
+            blocks.push(results.length > 1 ? `Result set ${setIndex + 1}:` : "");
+            blocks.push(renderTable(set));
+          });
+        } else {
+          blocks.push(`Statement ${index + 1} (${keyword}): OK`);
+        }
+      } catch (err) {
+        hasError = true;
+        blocks.push(`Statement ${index + 1} (${keyword}): ERROR`);
+        blocks.push(err && err.message ? err.message : String(err));
+      }
+    });
+
+    output.textContent = blocks.filter(Boolean).join("\n\n");
+    setStatus(hasError ? "Execution stopped بسبب خطأ في أحد الأوامر." : "SQL executed successfully.");
+  } catch (err) {
+    output.textContent = `[runtime error] ${err && err.message ? err.message : String(err)}`;
+    setStatus("Failed to load SQL runtime.");
+  } finally {
+    localStorage.setItem(storageKey, sqlText);
+  }
+}
+
+function analyzeScript() {
+  const sql = editor.value;
+  const statements = splitStatements(sql);
+
+  if (!statements.length) {
+    output.textContent = "No SQL statements found.";
+    setStatus("Add SQL statements then analyze again.");
+    return;
+  }
+
+  const counts = {};
+  const order = [];
+
+  statements.forEach((stmt, idx) => {
+    const key = firstKeyword(stmt);
+    counts[key] = (counts[key] || 0) + 1;
+    order.push(`${idx + 1}. ${key}`);
+  });
+
+  const summary = Object.entries(counts)
+    .map(([k, v]) => `${k}: ${v}`)
+    .join("\n");
+
+  const hasFinalSemicolon = sql.trim().endsWith(";");
+  const notes = [];
+  if (!hasFinalSemicolon) notes.push("- Recommendation: end script with ';'.");
+  if (!counts.CREATE && !counts.ALTER) notes.push("- No DDL detected (CREATE/ALTER). This may be fine depending on task.");
+  if (!counts.SELECT) notes.push("- No SELECT query detected.");
+
+  output.textContent = [
+    `Total statements: ${statements.length}`,
+    "",
+    "By command:",
+    summary,
+    "",
+    "Statements order:",
+    order.join("\n"),
+    "",
+    "Notes:",
+    notes.length ? notes.join("\n") : "- Script looks structurally good."
+  ].join("\n");
+
+  setStatus("Analysis completed.");
+  localStorage.setItem(storageKey, sql);
+}
+
+function clearOutput() {
+  output.textContent = "[output cleared]";
+  setStatus("Output cleared.");
+}
+
+function resetDatabase() {
+  if (database) {
+    database.close();
+    database = null;
+  }
+  sqlRuntimePromise = null;
+  output.textContent = "[in-memory database reset]";
+  setStatus("Database reset done.");
+}
+
+function resetSource() {
+  editor.value = sourceCode;
+  localStorage.setItem(storageKey, editor.value);
+  setStatus("Editor reset to source file.");
+}
+
+function downloadSql() {
+  const blob = new Blob([editor.value], { type: "text/sql" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.split("/").pop() || "program.sql";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  setStatus(`Downloaded ${a.download}`);
+}
+
+async function loadSource() {
+  try {
+    const res = await fetch(file, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    sourceCode = await res.text();
+  } catch {
+    sourceCode = DEFAULT_SQL;
+  }
+}
+
+async function init() {
+  await loadSource();
+  const saved = localStorage.getItem(storageKey);
+  editor.value = saved ?? sourceCode;
+}
+
+editor.addEventListener("input", () => {
+  localStorage.setItem(storageKey, editor.value);
+});
+
+document.getElementById("runBtn").addEventListener("click", runSql);
+document.getElementById("analyzeBtn").addEventListener("click", analyzeScript);
+document.getElementById("resetDbBtn").addEventListener("click", resetDatabase);
+document.getElementById("clearBtn").addEventListener("click", clearOutput);
+document.getElementById("resetBtn").addEventListener("click", resetSource);
+document.getElementById("downloadBtn").addEventListener("click", downloadSql);
+
+init();
+</script>
+</body>
+</html>

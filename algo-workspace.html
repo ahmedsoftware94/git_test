@@ -1,0 +1,371 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Algorithms Python Workspace</title>
+<style>
+:root {
+  --bg: #f5f3ff;
+  --panel: #ffffff;
+  --ink: #1e1b4b;
+  --muted: #5b4e9b;
+  --accent: #5b21b6;
+  --accent-dark: #4c1d95;
+  --line: #ddd6fe;
+  --out-bg: #1f1147;
+  --out-text: #e9d5ff;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  background: radial-gradient(circle at 85% 10%, #ddd6fe 0%, transparent 35%), var(--bg);
+  color: var(--ink);
+}
+header {
+  background: #312e81;
+  color: #fff;
+  padding: 16px;
+}
+header h1 { margin: 0; font-size: 22px; }
+header p { margin: 8px 0 0; color: #ddd6fe; }
+.wrap { width: min(1120px, 94%); margin: 20px auto; }
+.toolbar { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+button,
+.link-btn {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 700;
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+  text-decoration: none;
+}
+button:hover,
+.link-btn:hover { background: var(--accent-dark); }
+.layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+}
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 12px;
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.08);
+}
+.panel h2 { margin: 0 0 10px; font-size: 18px; }
+#fileInfo { margin: 0 0 10px; color: var(--muted); font-size: 14px; }
+#editor {
+  width: 100%;
+  min-height: 380px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: "Consolas", "Courier New", monospace;
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+}
+#output {
+  margin: 0;
+  min-height: 300px;
+  background: var(--out-bg);
+  color: var(--out-text);
+  border-radius: 10px;
+  padding: 12px;
+  font-family: "Consolas", "Courier New", monospace;
+  white-space: pre-wrap;
+  overflow: auto;
+}
+.meta { margin-top: 8px; color: var(--muted); font-size: 14px; }
+@media (min-width: 980px) {
+  .layout { grid-template-columns: 1.2fr 0.8fr; }
+}
+</style>
+</head>
+<body>
+<header>
+  <h1 id="title">Algorithms Python Workspace</h1>
+  <p>Run Python in browser (Pyodide) + algorithm-specific analysis.</p>
+</header>
+
+<div class="wrap">
+  <div class="toolbar">
+    <a class="link-btn" href="index.html">Back To Subjects</a>
+    <button id="runBtn" type="button">Run Python</button>
+    <button id="analyzeBtn" type="button">Analyze Algorithm</button>
+    <button id="clearBtn" type="button">Clear Output</button>
+    <button id="resetBtn" type="button">Reset Source</button>
+    <button id="downloadBtn" type="button">Download .py</button>
+  </div>
+
+  <div class="layout">
+    <section class="panel">
+      <h2>Algorithm Editor</h2>
+      <p id="fileInfo">Source: algo-practice/programs/program-1.py</p>
+      <textarea id="editor" spellcheck="false"></textarea>
+      <div class="meta" id="status">Tip: Ctrl+Enter to run Python.</div>
+    </section>
+
+    <section class="panel">
+      <h2>Output / Algorithm Report</h2>
+      <pre id="output">[output or report will appear here]</pre>
+    </section>
+  </div>
+</div>
+
+<script>
+const DEFAULT_ALGO = `def fibonacci(n):\n    seq = [0, 1]\n    while len(seq) < n:\n        seq.append(seq[-1] + seq[-2])\n    return seq[:n]\n\nif __name__ == '__main__':\n    print(fibonacci(10))`;
+const PYODIDE_VERSION = "0.26.4";
+const PYODIDE_LOAD_TIMEOUT_MS = 45000;
+const PYTHON_RUN_TIMEOUT_MS = 15000;
+
+const params = new URLSearchParams(window.location.search);
+const file = params.get("file") || "algo-practice/programs/program-1.py";
+const title = params.get("title") || "Algorithm Program";
+const storageKey = `algo_workspace:${file}`;
+
+const editor = document.getElementById("editor");
+const output = document.getElementById("output");
+const statusEl = document.getElementById("status");
+const runBtn = document.getElementById("runBtn");
+
+document.getElementById("title").textContent = title;
+document.getElementById("fileInfo").textContent = `Source: ${file}`;
+
+let sourceCode = DEFAULT_ALGO;
+let pyodideInstance = null;
+let running = false;
+
+function setStatus(msg) {
+  statusEl.textContent = msg;
+}
+
+function countMatches(text, regex) {
+  const matches = text.match(regex);
+  return matches ? matches.length : 0;
+}
+
+function withTimeout(promise, timeoutMs, timeoutMessage) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+    promise.then((value) => {
+      clearTimeout(timer);
+      resolve(value);
+    }).catch((error) => {
+      clearTimeout(timer);
+      reject(error);
+    });
+  });
+}
+
+function loadExternalScript(src) {
+  return new Promise((resolve, reject) => {
+    const existing = [...document.scripts].find((s) => s.src === src);
+    if (existing) {
+      if (existing.dataset.loaded === "1") {
+        resolve();
+        return;
+      }
+      existing.addEventListener("load", () => resolve(), { once: true });
+      existing.addEventListener("error", () => reject(new Error(`Failed to load: ${src}`)), { once: true });
+      return;
+    }
+
+    const script = document.createElement("script");
+    script.src = src;
+    script.async = true;
+    script.addEventListener("load", () => {
+      script.dataset.loaded = "1";
+      resolve();
+    }, { once: true });
+    script.addEventListener("error", () => reject(new Error(`Failed to load: ${src}`)), { once: true });
+    document.head.appendChild(script);
+  });
+}
+
+async function ensurePyodide() {
+  if (pyodideInstance) return pyodideInstance;
+
+  setStatus("Loading Python runtime (Pyodide)...");
+  const baseUrl = `https://cdn.jsdelivr.net/pyodide/v${PYODIDE_VERSION}/full/`;
+
+  if (!window.loadPyodide) {
+    await withTimeout(
+      loadExternalScript(`${baseUrl}pyodide.js`),
+      PYODIDE_LOAD_TIMEOUT_MS,
+      "Timed out while loading pyodide.js. Check internet or content blockers."
+    );
+  }
+
+  pyodideInstance = await withTimeout(
+    window.loadPyodide({ indexURL: baseUrl }),
+    PYODIDE_LOAD_TIMEOUT_MS,
+    "Timed out while initializing Python runtime."
+  );
+  setStatus("Python runtime is ready.");
+  return pyodideInstance;
+}
+
+async function runPython() {
+  if (running) return;
+  const code = editor.value;
+  running = true;
+  runBtn.disabled = true;
+  output.textContent = "[running python ...]";
+
+  try {
+    const pyodide = await ensurePyodide();
+    pyodide.globals.set("USER_CODE", code);
+
+    const result = await withTimeout(pyodide.runPythonAsync(`
+import io
+import sys
+import traceback
+import builtins
+
+def _blocked_input(*args, **kwargs):
+    raise RuntimeError("input() is not supported in browser runner. Use fixed test values.")
+
+builtins.input = _blocked_input
+
+_stdout = io.StringIO()
+_stderr = io.StringIO()
+_old_stdout, _old_stderr = sys.stdout, sys.stderr
+sys.stdout, sys.stderr = _stdout, _stderr
+
+try:
+    namespace = {"__name__": "__main__"}
+    exec(USER_CODE, namespace)
+except Exception:
+    traceback.print_exc()
+finally:
+    sys.stdout, sys.stderr = _old_stdout, _old_stderr
+
+out = _stdout.getvalue()
+err = _stderr.getvalue()
+(out + ("\\n" if out and err else "") + err).strip()
+`), PYTHON_RUN_TIMEOUT_MS, "Execution timed out. Remove input() or long/infinite loops.");
+
+    output.textContent = String(result || "[no output]");
+    setStatus("Python executed successfully.");
+  } catch (err) {
+    output.textContent = `[runtime error] ${err && err.message ? err.message : String(err)}`;
+    setStatus("Python run failed.");
+  } finally {
+    if (pyodideInstance) {
+      try { pyodideInstance.globals.delete("USER_CODE"); } catch {}
+    }
+    localStorage.setItem(storageKey, code);
+    running = false;
+    runBtn.disabled = false;
+  }
+}
+
+function detectRecursiveFunctions(code) {
+  const functions = [...code.matchAll(/^\s*def\s+(\w+)\s*\(/gm)].map((m) => m[1]);
+  return functions.filter((name) => {
+    const withoutDef = code.replace(new RegExp(`^\\s*def\\s+${name}\\s*\\(`, "m"), "");
+    return new RegExp(`\\b${name}\\s*\\(`).test(withoutDef);
+  });
+}
+
+function complexityHint(loopCount, recursiveCount) {
+  if (recursiveCount > 0 && loopCount > 0) return "Potentially high complexity: recursion + loops combined.";
+  if (recursiveCount > 0) return "Recursive solution detected. Check base case and stack depth.";
+  if (loopCount >= 2) return "Nested loops detected. Review for possible O(n^2) behavior.";
+  if (loopCount === 1) return "Single loop pattern detected. Often around O(n).";
+  return "No loops/recursion detected. Could be O(1) or rely on built-in operations.";
+}
+
+function analyzeAlgorithm() {
+  const code = editor.value;
+  const loopCount = countMatches(code, /^\s*(for|while)\b/gm);
+  const recursive = detectRecursiveFunctions(code);
+  const sortUsage = countMatches(code, /\.sort\s*\(|sorted\s*\(/g);
+  const searchUsage = countMatches(code, /binary|bisect/gi);
+
+  const report = [];
+  report.push(`Loop blocks: ${loopCount}`);
+  report.push(`Recursive functions: ${recursive.length ? recursive.join(", ") : "none"}`);
+  report.push(`Sort usage: ${sortUsage}`);
+  report.push(`Binary search keywords: ${searchUsage}`);
+  report.push("");
+  report.push("Complexity hint:");
+  report.push(`- ${complexityHint(loopCount, recursive.length)}`);
+  report.push("");
+  report.push("Checklist:");
+  report.push("- Verify edge cases (empty input, one element, max size).");
+  report.push("- Add comments for key steps of the algorithm.");
+  report.push("- Keep function names descriptive.");
+
+  output.textContent = report.join("\n");
+  setStatus("Algorithm analysis completed.");
+  localStorage.setItem(storageKey, code);
+}
+
+function clearOutput() {
+  output.textContent = "[output cleared]";
+  setStatus("Output cleared.");
+}
+
+function resetSource() {
+  editor.value = sourceCode;
+  localStorage.setItem(storageKey, editor.value);
+  setStatus("Editor reset to source file.");
+}
+
+function downloadCode() {
+  const blob = new Blob([editor.value], { type: "text/x-python" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = file.split("/").pop() || "program.py";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  setStatus(`Downloaded ${a.download}`);
+}
+
+async function loadSource() {
+  try {
+    const res = await fetch(file, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    sourceCode = await res.text();
+  } catch {
+    sourceCode = DEFAULT_ALGO;
+  }
+}
+
+async function init() {
+  await loadSource();
+  const saved = localStorage.getItem(storageKey);
+  editor.value = saved ?? sourceCode;
+}
+
+editor.addEventListener("input", () => {
+  localStorage.setItem(storageKey, editor.value);
+});
+
+editor.addEventListener("keydown", (event) => {
+  if (event.ctrlKey && event.key === "Enter") {
+    event.preventDefault();
+    runPython();
+  }
+});
+
+runBtn.addEventListener("click", runPython);
+document.getElementById("analyzeBtn").addEventListener("click", analyzeAlgorithm);
+document.getElementById("clearBtn").addEventListener("click", clearOutput);
+document.getElementById("resetBtn").addEventListener("click", resetSource);
+document.getElementById("downloadBtn").addEventListener("click", downloadCode);
+
+init();
+</script>
+</body>
+</html>
