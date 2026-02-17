@@ -684,8 +684,9 @@ a.pdf-btn{
           <div class="section-title">الملازم</div>
           <div class="pdf-actions">
             <button class="pdf-btn" onclick="openPdf('db','practical')">عملي.pdf</button>
-            <button class="pdf-btn" onclick="openPdf('db','theory')">نظري.pdf</button>
           </div>
+          <div id="dbLecturesList" class="pdf-actions"></div>
+          <p>أضف أي عدد من روابط محاضرات قواعد البيانات داخل <code>dbLecturePdfs</code> وسيظهر تلقائياً كـ المحاضرة 1، المحاضرة 2، ...</p>
         </div>
       </div>
     </div>
@@ -1324,8 +1325,8 @@ a.pdf-btn{
       <div class="hw-head"><h3>قواعد البيانات</h3></div>
       <div class="pdf-actions">
         <button class="pdf-btn" onclick="openPdf('db','practical')">عملي.pdf</button>
-        <button class="pdf-btn" onclick="openPdf('db','theory')">نظري.pdf</button>
       </div>
+      <div id="dbLecturesListInPdfs" class="pdf-actions"></div>
     </div>
 
     <div class="hw">
@@ -1860,7 +1861,7 @@ const mids = {
 
 // روابط ملفات الـ PDF (استبدل القيم بروابطك الفعلية)
 const pdfLinks = {
-  db:      {practical:"عملي.pdf", theory:"نظري.pdf"},
+  db:      {practical:"عملي.pdf"},
   micro:   {practical:"عملي.pdf", theory:"نظري.pdf"},
   cc:      {practical:"عملي.pdf", theory:"نظري.pdf"},
   algo:    {practical:"عملي.pdf", theory:"نظري.pdf"},
@@ -1869,6 +1870,13 @@ const pdfLinks = {
   se:      {practical:"عملي.pdf", theory:"نظري.pdf"},
   js:      {practical:"#", theory:"#"},
 };
+
+// محاضرات قواعد البيانات (أضف أي عدد من الروابط هنا)
+const dbLecturePdfs = [
+  "pdfs/dp1.pdf",
+  // "pdfs/db-lecture-2.pdf",
+  // "pdfs/db-lecture-3.pdf",
+];
 
 /* ===== بيانات نصوص الملاحظات (صفحة ملاحظات لكل مادة) ===== */
 const notes = {
@@ -2089,6 +2097,31 @@ function renderProgramList(containerId, programs, workspacePage){
   });
 }
 
+function renderDbLectureList(containerId){
+  const list = document.getElementById(containerId);
+  if (!list) return;
+
+  list.innerHTML = "";
+
+  if (!dbLecturePdfs.length){
+    list.textContent = "لا توجد محاضرات مضافة بعد.";
+    return;
+  }
+
+  dbLecturePdfs.forEach((link, index)=>{
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "pdf-btn";
+    button.textContent = `المحاضرة ${index + 1}`;
+    button.addEventListener("click", ()=>{
+      const title = `قواعد البيانات - المحاضرة ${index + 1}`;
+      const msg = `لم يتم إضافة رابط بعد لـ ${button.textContent} في مادة قواعد البيانات.\nضع الرابط داخل dbLecturePdfs داخل السكربت.`;
+      openPdfLink(title, link, msg);
+    });
+    list.appendChild(button);
+  });
+}
+
 function getSectionIconSvg(title){
   if (title.includes("الكوزات")) {
     return `<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.8 9.2a2.4 2.4 0 1 1 3.7 2c-.9.6-1.5 1.1-1.5 2"/><circle cx="12" cy="17.4" r="1"/></svg>`;
@@ -2153,6 +2186,8 @@ renderProgramList("jsProgramsList", jsPrograms, "js-workspace.html");
 renderProgramList("dbPracticalProgramsList", dbPracticalPrograms, "db-workspace.html");
 renderProgramList("sePracticalProgramsList", sePracticalPrograms, "se-workspace.html");
 renderProgramList("algoPracticalProgramsList", algoPracticalPrograms, "algo-workspace.html");
+renderDbLectureList("dbLecturesList");
+renderDbLectureList("dbLecturesListInPdfs");
 
 /* ================== NAVIGATION ================== */
 function openSub(id){
@@ -2284,6 +2319,18 @@ function openMid(btn){
 }
 
 /* ================== OPEN PDF ================== */
+function openPdfLink(title, link, emptyMessage){
+  if(link && link !== "#"){
+    const viewer = document.getElementById("pdfViewer");
+    const embed = document.getElementById("pdfEmbed");
+    document.getElementById("pdfTitle").textContent = title;
+    embed.src = link;
+    viewer.classList.remove("hidden");
+  }else{
+    openText(title, emptyMessage || "لم يتم إضافة رابط بعد.");
+  }
+}
+
 function openPdf(sub, kind){
   const titleMap = {
     db:"قواعد البيانات",
@@ -2298,17 +2345,9 @@ function openPdf(sub, kind){
 
   const kindLabel = kind === "practical" ? "عملي.pdf" : "نظري.pdf";
   const link = pdfLinks?.[sub]?.[kind];
-
-  if(link && link !== "#"){
-    const viewer = document.getElementById("pdfViewer");
-    const embed = document.getElementById("pdfEmbed");
-    document.getElementById("pdfTitle").textContent = `${titleMap[sub]} - ${kindLabel}`;
-    embed.src = link;
-    viewer.classList.remove("hidden");
-  }else{
-    const msg = `لم يتم إضافة رابط بعد لملف ${kindLabel} في ${titleMap[sub]}.\nضع الرابط في كائن pdfLinks داخل السكربت.`;
-    openText(`${titleMap[sub]} - ${kindLabel}`, msg);
-  }
+  const title = `${titleMap[sub]} - ${kindLabel}`;
+  const msg = `لم يتم إضافة رابط بعد لملف ${kindLabel} في ${titleMap[sub]}.\nضع الرابط في كائن pdfLinks داخل السكربت.`;
+  openPdfLink(title, link, msg);
 }
 
 function closePdf(){
