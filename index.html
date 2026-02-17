@@ -622,7 +622,7 @@ a.pdf-btn{
         <div class="hw">
           <div class="hw-head">
             <h3>Oracle Programs</h3>
-            <a class="pdf-btn" href="db-practice/index.html" target="_blank" rel="noopener">فتح بيئة Oracle</a>
+            <a class="pdf-btn" href="db-workspace.html" target="_blank" rel="noopener">فتح بيئة Oracle</a>
           </div>
           <p>أضف أي عدد من برامج Oracle داخل <code>dbPracticalPrograms</code> وسيظهر تلقائياً كـ Program 1, Program 2, ... وكل Program يفتح في بيئة Oracle.</p>
           <div id="dbPracticalProgramsList" class="pdf-actions"></div>
@@ -915,7 +915,7 @@ a.pdf-btn{
         <div class="hw">
           <div class="hw-head">
             <h3>Python Programs</h3>
-            <a class="pdf-btn" href="algo-practice/index.html" target="_blank" rel="noopener">فتح بيئة الخوارزميات</a>
+            <a class="pdf-btn" href="algo-workspace.html" target="_blank" rel="noopener">فتح بيئة الخوارزميات</a>
           </div>
           <p>أضف أي عدد من برامج Python داخل <code>algoPracticalPrograms</code> وسيظهر تلقائياً كـ Program 1, Program 2, ... وكل Program يفتح في بيئة الخوارزميات.</p>
           <div id="algoPracticalProgramsList" class="pdf-actions"></div>
@@ -1208,7 +1208,7 @@ a.pdf-btn{
         <div class="hw">
           <div class="hw-head">
             <h3>Python Programs</h3>
-            <a class="pdf-btn" href="se-practice/index.html" target="_blank" rel="noopener">فتح بيئة Python</a>
+            <a class="pdf-btn" href="se-workspace.html" target="_blank" rel="noopener">فتح بيئة Python</a>
           </div>
           <p>أضف أي عدد من برامج Python داخل <code>sePracticalPrograms</code> وسيظهر تلقائياً كـ Program 1, Program 2, ... وكل Program يفتح في بيئة هندسة البرمجيات.</p>
           <div id="sePracticalProgramsList" class="pdf-actions"></div>
@@ -1262,7 +1262,7 @@ a.pdf-btn{
         <div class="hw">
           <div class="hw-head">
             <h3>JS Programs</h3>
-            <a class="pdf-btn" href="js-practice/index.html" target="_blank" rel="noopener">فتح بيئة JavaScript</a>
+            <a class="pdf-btn" href="js-workspace.html" target="_blank" rel="noopener">فتح بيئة JavaScript</a>
           </div>
           <p>أضف روابط البرامج داخل <code>jsPrograms</code> وسيظهر تلقائياً كـ Program 1, Program 2, ... وكل Program يفتح في بيئة JavaScript.</p>
           <div id="jsProgramsList" class="pdf-actions"></div>
@@ -1996,27 +1996,27 @@ int main() {
 }
 `;
 const jsPrograms = [
-  "programs/program-1.js",
-  // "programs/program-2.js",
-  // "programs/program-3.js",
+  "js-practice/programs/program-1.js",
+  // "js-practice/programs/program-2.js",
+  // "js-practice/programs/program-3.js",
 ];
 
 const dbPracticalPrograms = [
-  "programs/program-1.sql",
-  // "programs/program-2.sql",
-  // "programs/program-3.sql",
+  "db-practice/programs/program-1.sql",
+  // "db-practice/programs/program-2.sql",
+  // "db-practice/programs/program-3.sql",
 ];
 
 const sePracticalPrograms = [
-  "programs/program-1.py",
-  // "programs/program-2.py",
-  // "programs/program-3.py",
+  "se-practice/programs/program-1.py",
+  // "se-practice/programs/program-2.py",
+  // "se-practice/programs/program-3.py",
 ];
 
 const algoPracticalPrograms = [
-  "programs/program-1.py",
-  // "programs/program-2.py",
-  // "programs/program-3.py",
+  "algo-practice/programs/program-1.py",
+  // "algo-practice/programs/program-2.py",
+  // "algo-practice/programs/program-3.py",
 ];
 
 function renderProgramList(containerId, programs, workspacePage){
@@ -2105,10 +2105,10 @@ function renderNotesInline(){
 }
 decorateSectionHeads();
 renderNotesInline();
-renderProgramList("jsProgramsList", jsPrograms, "js-practice/index.html");
-renderProgramList("dbPracticalProgramsList", dbPracticalPrograms, "db-practice/index.html");
-renderProgramList("sePracticalProgramsList", sePracticalPrograms, "se-practice/index.html");
-renderProgramList("algoPracticalProgramsList", algoPracticalPrograms, "algo-practice/index.html");
+renderProgramList("jsProgramsList", jsPrograms, "js-workspace.html");
+renderProgramList("dbPracticalProgramsList", dbPracticalPrograms, "db-workspace.html");
+renderProgramList("sePracticalProgramsList", sePracticalPrograms, "se-workspace.html");
+renderProgramList("algoPracticalProgramsList", algoPracticalPrograms, "algo-workspace.html");
 
 /* ================== NAVIGATION ================== */
 function openSub(id){
